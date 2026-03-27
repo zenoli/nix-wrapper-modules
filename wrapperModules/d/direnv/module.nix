@@ -33,6 +33,7 @@ in
     };
     lib = lib.mkOption {
       type = with lib.types; attrsOf lines;
+      description = "TODO";
       default = { };
     };
     extraConfig = lib.mkOption {
