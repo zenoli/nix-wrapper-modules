@@ -5,18 +5,6 @@
 
 let
   lib = pkgs.lib;
-  # wrapperWithoutNixDirenv = self.wrappers.direnv.wrap {
-  #   inherit pkgs;
-  #   nix-direnv.enable = true;
-  # };
-  # wrapperWithNixDirenv = self.wrappers.direnv.wrap {
-  #   inherit pkgs;
-  #   nix-direnv.enable = true;
-  # };
-  # TODO: This seems dumb. Is there no better way to do this?
-  # cfg = (wrapperWithNixDirenv.eval { }).config;
-  # dotdir = "${wrapperWithNixDirenv}/${cfg.configDirname}";
-
   testUtils = ''
     is_directory() {
       local path="$1"
@@ -40,8 +28,8 @@ let
   '';
 
   runTest =
-    name: attrs: script:
-    pkgs.runCommand name attrs ''
+    name: script:
+    pkgs.runCommand name { } ''
       ${testUtils}
 
       ${script}
@@ -49,16 +37,26 @@ let
       touch $out
     '';
 
-  runCheck = name: (import ./checks/${name}) { inherit pkgs self runTest; };
+  runTests =
+    name: tests:
+    runTest "test-group-${name}" ''
+      # "${lib.concatStringsSep " " tests}"
+    '';
+
+  runCheck =
+    name:
+    (import ./checks/${name}) {
+      inherit
+        pkgs
+        self
+        runTest
+        runTests
+        ;
+    };
   checks = lib.pipe ./checks [
     builtins.readDir
     (lib.filterAttrs (name: type: type == "regular"))
     (lib.mapAttrsToList (name: _: (runCheck name)))
   ];
 in
-# TODO: We need to return a derivation.
-# Create a dummie derivation that references `checks` to
-# ensure they are evaluated.
-runTest "all-tests" { } ''
-  # "${lib.concatStringsSep " " checks}"
-''
+runTests "direnv-all" checks
