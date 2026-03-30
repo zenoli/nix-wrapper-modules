@@ -4,6 +4,7 @@
   lib,
   wlib,
   extendModules,
+  moduleType,
   # NOTE: makes sure builderFunction gets name from _module.args
   name ? null,
   ...
@@ -172,7 +173,162 @@ in
   '';
   config.meta.maintainers = [ wlib.maintainers.birdee ];
   config._module.args.pkgs = config.pkgs;
+  config.install.modules = {
+    homeManager =
+      { config, ... }:
+      {
+        config.home.packages =
+          let
+            cfg = args.config.install.getWrapperConfig config;
+          in
+          lib.mkIf cfg.enable [ cfg.wrapper ];
+      };
+    nixos =
+      { config, ... }:
+      {
+        config.environment.systemPackages =
+          let
+            cfg = args.config.install.getWrapperConfig config;
+          in
+          lib.mkIf cfg.enable [ cfg.wrapper ];
+      };
+    darwin =
+      { config, ... }:
+      {
+        config.environment.systemPackages =
+          let
+            cfg = args.config.install.getWrapperConfig config;
+          in
+          lib.mkIf cfg.enable [ cfg.wrapper ];
+      };
+  };
   options = {
+    install = lib.mkOption {
+      description = "options which create a generic integration module. i.e. in nixos or home manager `{ imports = [ inputs.nix-wrapper-modules.wrappers.<name>.install ]; }`";
+      type = lib.types.submodule (
+        { config, ... }:
+        {
+          _file = wlib.core;
+          options = {
+            optionLocation = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = lib.optionals (args.config._module.args.name or null != null) [
+                "wrappers"
+                args.config._module.args.name
+              ];
+              description = ''
+                The location for the generated submodule option containing the wrapper module
+
+                This will be set for you if you use the provided flake-parts module or `wlib.mkInstallModule`, otherwise you must set it manually.
+
+                This is to prevent the option location depending on the `pkgs` of the target evaluation, as it would if we used `config.binName`.
+              '';
+            };
+            addWrapperModule = lib.mkOption {
+              type = lib.types.functionTo lib.types.raw;
+              readOnly = true;
+              default =
+                key: module:
+                lib.setAttrByPath config.optionLocation {
+                  imports = lib.toList module;
+                  key = builtins.unsafeDiscardStringContext "${wlib.core}:${
+                    if lib.isStringLike module then "${module}." else ""
+                  }install.addWrapperModule:${toString key}";
+                };
+              description = ''
+                Function that takes a wrapper module to place at the path indicated by optionLocation.
+
+                usage `config = config.install.addWrapperModule "unique key name" ({ wlib, pkgs, lib, config, ... }: { });`
+
+                To provide this alongside the config for the target module system, you can use `lib.mkMerge`
+
+                ```nix
+                { config, pkgs, lib, ... }: {
+                  config = lib.mkMerge [
+                    # config for nixos module (in this example)
+                    {
+                      systemd.packages = let
+                        cfg = config.install.getWrapperConfig config;
+                      in lib.mkIf cfg.enableService [ cfg.wrapper ];
+                    }
+                    # pass another wrapper module for only this module system
+                    (config.install.addWrapperModule "unique key name" ({ wlib, pkgs, lib, config, ... }: {
+                      options.enableService = lib.mkEnableOption "install service units";
+                    }))
+                  ];
+                }
+                ```
+              '';
+            };
+            getWrapperConfig = lib.mkOption {
+              type = lib.types.functionTo lib.types.raw;
+              default =
+                let
+                  res = lib.attrByPath config.optionLocation null;
+                in
+                if res == null then
+                  throw "could not find the wrapper config! `getWrapperConfig` works only in the modules exported by `<this_wrapper_module>.install` and the configurations which import it!"
+                else
+                  res;
+              readOnly = true;
+              description = ''
+                This option indexes into config and returns the wrapper submodule at `config.install.optionLocation` within it
+
+                ```nix
+                { ... }@top: {
+                  config.install.modules.nixos = { config, lib, ... }: let
+                    wrappercfg = top.config.install.getWrapperConfig config;
+                  in {
+                    config = lib.mkIf wrappercfg.enable {
+                      # ...
+                    };
+                  };
+                }
+                ```
+              '';
+            };
+            modules = lib.mkOption {
+              type = lib.types.lazyAttrsOf lib.types.deferredModule;
+              # don't set default, instead set via config, so that you can add some default behavior to some of them
+              description = ''
+                A set of modules for integrating the wrapper module with an external module system. Place a module at the attribute name corresponding with the class of the target module evaluation
+              '';
+            };
+            __functor = lib.mkOption {
+              type = lib.types.raw;
+              internal = true;
+              readOnly = true;
+              default =
+                _:
+                {
+                  _class,
+                  pkgs ? null,
+                  ...
+                }:
+                {
+                  _file = wlib.core;
+                  imports = lib.toList (config.modules.${_class} or [ ]);
+                  options =
+                    assert
+                      config.optionLocation != [ ]
+                      || throw "to import `<wrapper_module>.install`, you must set `config.install.optionLocation` to a non-empty list of strings!";
+                    lib.setAttrByPath config.optionLocation (
+                      lib.mkOption {
+                        type = moduleType;
+                        default = { };
+                      }
+                    );
+                  config = config.addWrapperModule "wrappers-install-add-enable-option" {
+                    _file = wlib.core;
+                    options.enable = lib.mkEnableOption "the wrapper module.";
+                    config.pkgs = lib.mkIf (pkgs != null) pkgs;
+                  };
+                };
+            };
+          };
+        }
+      );
+    };
     meta = {
       maintainers = lib.mkOption {
         description = "Maintainers of this module.";
@@ -419,7 +575,7 @@ in
     };
     binName = lib.mkOption {
       type = lib.types.str;
-      default =
+      default = builtins.unsafeDiscardStringContext (
         if config.package.meta.mainProgram or null != null then
           baseNameOf (
             builtins.addErrorContext ''
@@ -430,8 +586,8 @@ in
         else if builtins.isString config.package || builtins.isPath config.package then
           baseNameOf (toString config.package)
         else
-          config.package.pname or config.package.name
-            or (throw "config.binName was not able to be detected!");
+          config.package.pname or config.package.name or (throw "config.binName was not able to be detected!")
+      );
       description = ''
         The name of the binary to be output to `config.wrapperPaths.placeholder`
 
@@ -440,7 +596,7 @@ in
     };
     exePath = lib.mkOption {
       type = lib.types.nullOr wlib.types.nonEmptyLine;
-      default =
+      default = builtins.unsafeDiscardStringContext (
         if config.package.meta.mainProgram or null != null then
           lib.removePrefix "/" (
             lib.removePrefix "${config.package}" (
@@ -457,7 +613,8 @@ in
           lib.optionalString (config.binDir != null) "${config.binDir}/"
           + "${config.package.pname or config.package.name
             or (throw "config.binName was not able to be detected! Please specify it manually!")
-          }";
+          }"
+      );
       description = ''
         The relative path to the executable to wrap. i.e. `bin/exename`
 
