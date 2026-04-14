@@ -57,6 +57,15 @@
           This output will be replaced with module paths on April 30, 2026
         ''
       ) self.wrappers;
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = import (inputs.pkgs.path or inputs.nixpkgs or <nixpkgs>) { inherit system; };
+        in
+        lib.mapAttrs (
+          _: module: self.lib.evalPackage [ { inherit pkgs; } module ]
+        ) self.lib.wrapperModules
+      );
       formatter = forAllSystems (
         system:
         (

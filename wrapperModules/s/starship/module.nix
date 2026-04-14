@@ -22,9 +22,10 @@ let
   ];
   tomlFmt = pkgs.formats.toml { };
   tomlSettings = tomlFmt.generate "starship.toml" config.settings;
-  presetToml = pkgs.runCommand "starship-preset-${config.preset}.toml" { } ''
-    ${lib.getExe pkgs.starship} preset ${config.preset} > $out
-  '';
+  # presetToml = pkgs.runCommand "starship-preset-${config.preset}.toml" { } ''
+  #   ${lib.getExe pkgs.starship} preset ${config.preset} > $out
+  # '';
+  presetToml = config.package.src + "/docs/public/presets/toml/${config.preset}.toml";
   configFile = if config.preset != null then presetToml else tomlSettings;
 in
 {
@@ -50,6 +51,7 @@ in
   };
   config = {
     package = lib.mkDefault pkgs.starship;
+    preset = "tokyo-night";
     constructFiles."starship.toml" = {
       content = builtins.readFile configFile;
       relPath = "starship.toml";
