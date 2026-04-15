@@ -1,11 +1,11 @@
-{ lib, runCommand, ... }: 
+{ lib, runCommand, ... }:
 let
   createAssertion =
     { cond, message }:
     ''
       (${cond}) || (echo "${message}" >&2; return 1)
     '';
-in 
+in
 {
   inherit createAssertion;
   isDirectory =
