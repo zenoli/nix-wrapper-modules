@@ -23,9 +23,11 @@ let
     dotdir;
 in
 runTests { wrapperModule = self.wrappers.direnv; } [
+
   (runTest "wrapper should output correct version" (wrapper: ''
     "${wrapper}/bin/direnv" --version | grep -q "${wrapper.version}"
   ''))
+
   (runTest
     {
       name = "if nix-direnv is enabled then lib/nix-direnv.sh should exists";
@@ -36,6 +38,7 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")
     ])
   )
+
   (runTest
     {
       name = "if nix-direnv is disabled then lib/nix-direnv.sh should not exist";
@@ -46,6 +49,7 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       (notIsFile "${getDotdir wrapper}/lib/nix-direnv.sh")
     ])
   )
+
   (runTest
     {
       name = "if mise is enabled then lib/mise.sh should exists";
@@ -56,6 +60,7 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       (isFile "${getDotdir wrapper}/lib/mise.sh")
     ])
   )
+
   (runTest
     {
       name = "if mise is disabled then lib/mise.sh should not exist";
@@ -66,26 +71,26 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       (notIsFile "${getDotdir wrapper}/lib/mise.sh")
     ])
   )
-  (
-    (runTest
-      {
-        name = "if a lib-script is set then it should be generated";
-        config.lib."foo.sh" = "echo foo";
-      }
-      (
-        wrapper:
-        let
-          libScriptFile = "${getDotdir wrapper}/lib/foo.sh";
-        in
-        [
-          (isDirectory (getDotdir wrapper))
-          (isFile libScriptFile)
-          (fileContains libScriptFile "echo foo")
 
-        ]
-      )
+  (runTest
+    {
+      name = "if a lib-script is set then it should be generated";
+      config.lib."foo.sh" = "echo foo";
+    }
+    (
+      wrapper:
+      let
+        libScriptFile = "${getDotdir wrapper}/lib/foo.sh";
+        cfg = wrapper.passthru.configuration;
+      in
+      [
+        (isDirectory (getDotdir wrapper))
+        (isFile libScriptFile)
+        (fileContains libScriptFile cfg.lib."foo.sh")
+      ]
     )
   )
+
   (runTest
     {
       name = "if silent mode is enabled then log settings should be set";
@@ -104,6 +109,7 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       ]
     )
   )
+
   (runTest
     {
       name = "if extraConfig is working";
@@ -122,20 +128,23 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       ]
     )
   )
-  # (
-  #   let
-  #     direnvrcContent = "echo foo";
-  #   in
-  #   (runTest "if direnvrc is working" { direnvrc = direnvrcContent; } (
-  #     wrapper:
-  #     let
-  #       direnvrcFile = "${getDotdir wrapper}/direnvrc";
-  #     in
-  #     [
-  #       (isDirectory (getDotdir wrapper))
-  #       (isFile direnvrcFile)
-  #       (fileContains direnvrcFile direnvrcContent)
-  #     ]
-  #   ))
-  # )
+
+  (runTest
+    {
+      name = "if direnvrc is working";
+      config.direnvrc = "echo blubb";
+    }
+    (
+      wrapper:
+      let
+        direnvrcFile = "${getDotdir wrapper}/direnvrc";
+        cfg = wrapper.passthru.configuration;
+      in
+      [
+        (isDirectory (getDotdir wrapper))
+        (isFile direnvrcFile)
+        (fileContains direnvrcFile cfg.direnvrc)
+      ]
+    )
+  )
 ]
