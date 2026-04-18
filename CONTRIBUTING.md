@@ -225,6 +225,7 @@ You can do this by providing an `attrs` instead of a string to `runTest` and pro
     config.nix-direnv.enable = true;                                        # <-- provide test-specific config
   }
   (wrapper: [  # <-- this wrapper has the above config applied
+  # ({ wrapper, config }: [  # <-- or like this, if you also want to access the wrapper config
     (isDirectory (getDotdir wrapper))
     (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")
   ])
@@ -234,7 +235,7 @@ You can do this by providing an `attrs` instead of a string to `runTest` and pro
 Of course, nothing keeps you from instantiating your wrappers from scratch. The above direnv example could 
 equivalently be written as:
 
-```
+```nix
 (runTest "if nix-direnv is enabled then lib/nix-direnv.sh should exists" (
   let
     wrapper = self.wrappers.direnv.wrap {

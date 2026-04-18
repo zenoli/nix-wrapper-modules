@@ -16,7 +16,7 @@ let
   getDotdir =
     wrapper:
     let
-      cfg = (wrapper.eval { }).config;
+      cfg = wrapper.passthru.configuration;
       dotdir = "${wrapper}/${cfg.configDirname}";
     in
     dotdir;
@@ -77,15 +77,15 @@ runTests { wrapperModule = self.wrappers.direnv; } [
       config.lib."foo.sh" = "echo foo";
     }
     (
-      wrapper:
+      { wrapper, config }:
       let
-        libScriptFile = "${getDotdir wrapper}/lib/foo.sh";
-        cfg = wrapper.passthru.configuration;
+        dotdir = getDotdir wrapper;
+        libScriptFile = dotdir + "/lib/foo.sh";
       in
       [
-        (isDirectory (getDotdir wrapper))
+        (isDirectory dotdir)
         (isFile libScriptFile)
-        (fileContains libScriptFile cfg.lib."foo.sh")
+        (fileContains libScriptFile config.lib."foo.sh")
       ]
     )
   )
@@ -98,10 +98,11 @@ runTests { wrapperModule = self.wrappers.direnv; } [
     (
       wrapper:
       let
-        direnvTomlFile = "${getDotdir wrapper}/direnv.toml";
+        dotdir = getDotdir wrapper;
+        direnvTomlFile = dotdir + "/direnv.toml";
       in
       [
-        (isDirectory (getDotdir wrapper))
+        (isDirectory dotdir)
         (isFile direnvTomlFile)
         (fileContains direnvTomlFile "log_format")
         (fileContains direnvTomlFile "log_filter")
@@ -117,10 +118,11 @@ runTests { wrapperModule = self.wrappers.direnv; } [
     (
       wrapper:
       let
-        direnvTomlFile = "${getDotdir wrapper}/direnv.toml";
+        dotdir = getDotdir wrapper;
+        direnvTomlFile = dotdir + "/direnv.toml";
       in
       [
-        (isDirectory (getDotdir wrapper))
+        (isDirectory dotdir)
         (isFile direnvTomlFile)
         (fileContains direnvTomlFile "\\[fooSection\\]")
         (fileContains direnvTomlFile "fooKey.*fooValue")
@@ -131,18 +133,18 @@ runTests { wrapperModule = self.wrappers.direnv; } [
   (runTest
     {
       name = "if direnvrc is working";
-      config.direnvrc = "echo blubb";
+      config.direnvrc = "echo foo";
     }
     (
-      wrapper:
+      { wrapper, config }:
       let
-        direnvrcFile = "${getDotdir wrapper}/direnvrc";
-        cfg = wrapper.passthru.configuration;
+        dotdir = getDotdir wrapper;
+        direnvrcFile = dotdir + "/direnvrc";
       in
       [
-        (isDirectory (getDotdir wrapper))
+        (isDirectory dotdir)
         (isFile direnvrcFile)
-        (fileContains direnvrcFile cfg.direnvrc)
+        (fileContains direnvrcFile config.direnvrc)
       ]
     )
   )

@@ -56,7 +56,18 @@ let
     assertions: wrapper:
     let
       wrapperWithConfig = wrapper.wrap config;
-      assertions' = if lib.isFunction assertions then assertions wrapperWithConfig else assertions;
+      assertions' =
+        if lib.isFunction assertions then
+          # Shorthand notation (wrapper: assertions)
+          if lib.functionArgs assertions == { } then
+            assertions wrapperWithConfig
+          else
+            assertions {
+              wrapper = wrapperWithConfig;
+              config = wrapperWithConfig.passthru.configuration;
+            }
+        else
+          assertions;
     in
     ''
       run() {
