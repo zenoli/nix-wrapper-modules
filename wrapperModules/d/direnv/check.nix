@@ -22,7 +22,7 @@ let
     in
     dotdir;
 in
-runTests self.wrappers.direnv [
+runTests { wrapperModule = self.wrappers.direnv; } [
   (runTest "wrapper should output correct version" { } (wrapper: ''
     "${wrapper}/bin/direnv" --version | grep -q "${wrapper.version}"
   ''))

@@ -44,18 +44,20 @@ in
     };
 
   runTests =
-    wrapperModule: tests:
+    settings: tests:
     let
-      wrapper = wrapperModule.apply { inherit pkgs; };
+      wrapper = settings.wrapperModule.apply { inherit pkgs; };
+      name = settings.name or "${wrapper.binName}-test";
       testsWithWrapper = lib.map (test: test wrapper) tests;
     in
     if builtins.elem stdenv.hostPlatform.system wrapper.meta.platforms then
-      lib.trace "Running test!" runCommand "${wrapper.binName}-test" { } ''
+      lib.trace "Running test!" runCommand name { } ''
         ${lib.concatStringsSep "\n\n" testsWithWrapper}
         touch $out
       ''
     else
       lib.trace "Skipping test..." null;
+
   runTest =
     name: config: assertions: wrapper:
     let
