@@ -59,7 +59,11 @@ in
       lib.trace "Skipping test..." null;
 
   runTest =
-    name: config: assertions: wrapper:
+    {
+      name,
+      config ? { },
+    }:
+    assertions: wrapper:
     let
       wrapperWithConfig = wrapper.wrap config;
     in
