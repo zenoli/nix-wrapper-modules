@@ -44,7 +44,7 @@ let
         globalCtx: localCtx:
         (
           let
-            wrapper = globalCtx.wrapper.wrap localCtx.config;
+            wrapper = globalCtx.wrapper.wrap (localCtx.config or { });
             config = wrapper.passthru.configuration;
           in
           {
@@ -60,9 +60,30 @@ let
         defaultContext = "wrapper";
       } tests;
 
-  # generic runTest
   runTest =
-    { name, context }:
+    nameOrSettings: assertions: contextFn: defaultContext:
+    let
+      settings =
+        if (lib.isAttrs nameOrSettings) && (nameOrSettings ? name) then
+          nameOrSettings
+        else if lib.isString nameOrSettings then
+          {
+            name = nameOrSettings;
+          }
+        else
+          throw ''
+            Invalid argument for `runTest`.
+            The first argument must be either a string (the test name) or an attrs
+            matching { name, config ? { } }, but got:
+
+            ${lib.toJSON nameOrSettings}
+          '';
+    in
+    _runTest settings assertions contextFn defaultContext;
+
+  # generic runTest
+  _runTest =
+    { name, context ? { } }:
     assertions: contextFn: defaultContext:
     let
       mergedContext = contextFn context;

@@ -27,9 +27,9 @@ in
 
 runWrapperTests self.wrappers.direnv [
 
-  # (runTest "wrapper should output correct version" (wrapper: ''
-  #   "${wrapper}/bin/direnv" --version | grep -q "${wrapper.version}"
-  # ''))
+  (runTest "wrapper should output correct version" (wrapper: ''
+    "${wrapper}/bin/direnv" --version | grep -q "${wrapper.version}"
+  ''))
 
   (runTest
     {
