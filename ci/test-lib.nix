@@ -18,12 +18,20 @@ let
       name,
       context ? { },
       contextFn ? globalCtx: localCtx: globalCtx // localCtx,
+      extendContext ? ctx: { },
       defaultContext ? null,
       cond ? (ctx: true),
     }:
     tests:
     let
-      testsWithContext = lib.map (test: test (contextFn context) defaultContext) tests;
+      tmp =
+        localCtx:
+        let
+          appliedContext = (contextFn context) localCtx;
+        in
+        # appliedContext // (extendContext (appliedContext));
+        (extendContext (appliedContext)) // appliedContext;
+      testsWithContext = lib.map (test: test tmp defaultContext) tests;
     in
     if cond context then
       lib.trace "Running test!" runCommand name { } ''
@@ -34,10 +42,14 @@ let
       lib.trace "Skipping test..." null;
 
   runWrapperTests =
-    wrapperModule:
+    {
+      wrapperModule,
+      name ? null,
+      extendContext ? ctx: { },
+    }:
     tests:
     let
-      name = "${wrapper.binName}-test";
+      name' = if name != null then name else "${wrapper.binName}-test";
       wrapper = wrapperModule.apply { inherit pkgs; };
       context = { inherit wrapperModule wrapper; };
       contextFn =
@@ -47,18 +59,24 @@ let
             wrapper = globalCtx.wrapper.wrap (localCtx.config or { });
             config = wrapper.passthru.configuration;
           in
-          {
-            inherit wrapper config;
+          localCtx // {
             inherit (globalCtx) wrapperModule;
+            inherit wrapper config;
           }
         );
       cond = ctx: builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms;
-      
-    in 
-      runTests { 
-        inherit name context contextFn cond;
-        defaultContext = "wrapper";
-      } tests;
+
+    in
+    runTests {
+      inherit
+        context
+        cond
+        contextFn
+        extendContext
+        ;
+      name = name';
+      defaultContext = "wrapper";
+    } tests;
 
   runTest =
     nameOrSettings: assertions: contextFn: defaultContext:
@@ -74,7 +92,7 @@ let
           throw ''
             Invalid argument for `runTest`.
             The first argument must be either a string (the test name) or an attrs
-            matching { name, config ? { } }, but got:
+            matching { name, context ? { } }, but got:
 
             ${lib.toJSON nameOrSettings}
           '';
@@ -83,7 +101,10 @@ let
 
   # generic runTest
   _runTest =
-    { name, context ? { } }:
+    {
+      name,
+      context ? { },
+    }:
     assertions: contextFn: defaultContext:
     let
       mergedContext = contextFn context;
@@ -95,10 +116,10 @@ let
                 `defaultContext` must be an attribute of `mergedContext`, but got:
 
                 defaultContext: ${defaultContext}, 
-                mergedContext attributes: [${lib.concatMapAttrsStringSep ", " (n: _ : n) mergedContext}]
+                mergedContext attributes: [${lib.concatMapAttrsStringSep ", " (n: _: n) mergedContext}]
               ''
             else
-            assertions mergedContext."${defaultContext}"
+              assertions mergedContext."${defaultContext}"
           else
             assertions mergedContext
         else
