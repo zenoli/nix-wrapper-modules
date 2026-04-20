@@ -12,20 +12,85 @@ let
     ''
       (${cond}) || (echo "${message}" >&2; return 1)
     '';
-  runTests =
-    settings: tests:
+
+  runTests2 =
+    {
+      name,
+      context ? { },
+      contextFn ? globalCtx: localCtx: globalCtx // localCtx,
+      cond ? (ctx: true),
+    }:
+    tests:
     let
-      wrapper = settings.wrapperModule.apply { inherit pkgs; };
-      name = settings.name or "${wrapper.binName}-test";
-      testsWithWrapper = lib.map (test: test wrapper) tests;
+      testsWithContext = lib.map (test: test (contextFn context)) tests;
     in
-    if builtins.elem stdenv.hostPlatform.system wrapper.meta.platforms then
+    if cond context then
       lib.trace "Running test!" runCommand name { } ''
-        ${lib.concatStringsSep "\n\n" testsWithWrapper}
+        ${lib.concatStringsSep "\n\n" testsWithContext}
         touch $out
       ''
     else
       lib.trace "Skipping test..." null;
+
+  # generic runTest
+  runTest2 =
+    { name, context }:
+    assertions: contextFn:
+    let
+      mergedContext = contextFn context;
+      assertions' = assertions mergedContext;
+    in
+    ''
+      run() {
+        ${lib.concatMapStringsSep " && " (a: "(${a})") (lib.toList assertions')}
+      }
+
+      run || (echo 'test "${name}" failed' >&2 && exit 1)
+    '';
+
+  # runTestWithConfig2 =
+  #   {
+  #     name,
+  #     context ? { },
+  #   }:
+  #   assertions: wrapper:
+  #   let
+  #
+  #     wrapperWithConfig = wrapper.wrap config;
+  #     assertions' =
+  #       if lib.isFunction assertions then
+  #         # Shorthand notation (wrapper: assertions)
+  #         if lib.functionArgs assertions == { } then
+  #           assertions wrapperWithConfig
+  #         else
+  #           assertions {
+  #             wrapper = wrapperWithConfig;
+  #             config = wrapperWithConfig.passthru.configuration;
+  #           }
+  #       else
+  #         assertions;
+  #   in
+  #   ''
+  #     run() {
+  #       ${lib.concatMapStringsSep " && " (a: "(${a})") (lib.toList assertions')}
+  #     }
+  #
+  #     run || (echo 'test "${name}" failed' >&2 && exit 1)
+  #   '';
+
+  # runWrapperTests
+  runTests =
+    settings: tests:
+    let
+      wrapperModule = settings.wrapperModule;
+      wrapper = wrapperModule.apply { inherit pkgs; };
+      name = settings.name or "${wrapper.binName}-test";
+      cond = ctx: (builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms);
+    in
+    runTests2 {
+      inherit name cond;
+      context = { inherit wrapperModule wrapper; };
+    } tests;
 
   runTest =
     nameOrSettings: assertions: wrapper:
@@ -82,6 +147,8 @@ in
     createAssertion
     runTests
     runTest
+    runTests2
+    runTest2
     runTestWithConfig
     ;
   isDirectory =
