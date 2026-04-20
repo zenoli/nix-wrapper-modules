@@ -14,6 +14,7 @@ let
     notIsFile
     runTest
     runTests
+    runWrapperTests2
     runTest2
     runTests2
     ;
@@ -25,26 +26,7 @@ let
     in
     dotdir;
 in
-runTests2
-  {
-    name = "direnv-test";
-    context = {
-      wrapperModule = self.wrappers.direnv;
-      wrapper = self.wrappers.direnv.apply { inherit pkgs; };
-    };
-    contextFn =
-      globalCtx: localCtx:
-      (
-        let
-          wrapper = globalCtx.wrapper.wrap localCtx.config;
-          config = wrapper.passthru.configuration;
-        in
-        {
-          inherit wrapper config;
-        }
-      );
-    cond = ctx: builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms;
-  }
+runWrapperTests2 self.wrappers.direnv
   [
     (runTest2
       {
@@ -54,7 +36,7 @@ runTests2
         };
       }
       (
-        { wrapper, config }:
+        { wrapper, ... }:
         [
           (isDirectory (getDotdir wrapper))
           (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")

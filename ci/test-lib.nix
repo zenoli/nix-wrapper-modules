@@ -32,6 +32,31 @@ let
     else
       lib.trace "Skipping test..." null;
 
+  runWrapperTests2 =
+    wrapperModule:
+    tests:
+    let
+      name = "${wrapper.binName}-test";
+      wrapper = wrapperModule.apply { inherit pkgs; };
+      context = { inherit wrapperModule wrapper; };
+      contextFn =
+        globalCtx: localCtx:
+        (
+          let
+            wrapper = globalCtx.wrapper.wrap localCtx.config;
+            # TODO: Which wrapper is read here?
+            config = wrapper.passthru.configuration;
+          in
+          {
+            inherit wrapper config;
+            inherit (globalCtx) wrapperModule;
+          }
+        );
+      cond = ctx: builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms;
+      
+    in 
+      runTests2 { inherit name context contextFn cond; } tests;
+
   # generic runTest
   runTest2 =
     { name, context }:
@@ -147,6 +172,7 @@ in
     createAssertion
     runTests
     runTest
+    runWrapperTests2
     runTests2
     runTest2
     runTestWithConfig
