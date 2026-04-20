@@ -66,15 +66,17 @@ let
     assertions: contextFn: defaultContext:
     let
       mergedContext = contextFn context;
-      # assertions' = assertions 
-      # (if defaultContext == null then 
-      #   mergedContext
-      # else
-      #   mergedContext."${defaultContext}");
       assertions' =
         if lib.isFunction assertions then
-          # Shorthand notation (wrapper: assertions)
           if lib.functionArgs assertions == { } && defaultContext != null then
+            if !(lib.hasAttr defaultContext mergedContext) then
+              throw ''
+                `defaultContext` must be an attribute of `mergedContext`, but got:
+
+                defaultContext: ${defaultContext}, 
+                mergedContext attributes: [${lib.concatMapAttrsStringSep ", " (n: _ : n) mergedContext}]
+              ''
+            else
             assertions mergedContext."${defaultContext}"
           else
             assertions mergedContext
