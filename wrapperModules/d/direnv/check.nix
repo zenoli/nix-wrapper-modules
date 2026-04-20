@@ -14,9 +14,7 @@ let
     notIsFile
     runTest
     runTests
-    runWrapperTests2
-    runTest2
-    runTests2
+    runWrapperTests
     ;
   getDotdir =
     wrapper:
@@ -26,41 +24,23 @@ let
     in
     dotdir;
 in
-runWrapperTests2 self.wrappers.direnv
-  [
-    (runTest2
-      {
-        name = "if nix-direnv is enabled then lib/nix-direnv.sh should exists";
-        context = {
-          config.nix-direnv.enable = true;
-        };
-      }
-      (
-        wrapper:
-        [
-          (isDirectory (getDotdir wrapper))
-          (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")
-        ]
-      )
-    )
-  ]
 
-# runTests { wrapperModule = self.wrappers.direnv; } [
-#
-#   (runTest "wrapper should output correct version" (wrapper: ''
-#     "${wrapper}/bin/direnv" --version | grep -q "${wrapper.version}"
-#   ''))
-#
-#   (runTest
-#     {
-#       name = "if nix-direnv is enabled then lib/nix-direnv.sh should exists";
-#       config.nix-direnv.enable = true;
-#     }
-#     (wrapper: [
-#       (isDirectory (getDotdir wrapper))
-#       (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")
-#     ])
-#   )
+runWrapperTests self.wrappers.direnv [
+
+  # (runTest "wrapper should output correct version" (wrapper: ''
+  #   "${wrapper}/bin/direnv" --version | grep -q "${wrapper.version}"
+  # ''))
+
+  (runTest
+    {
+      name = "if nix-direnv is enabled then lib/nix-direnv.sh should exists";
+      context = { config.nix-direnv.enable = true; };
+    }
+    (wrapper: [
+      (isDirectory (getDotdir wrapper))
+      (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")
+    ])
+  )
 #
 #   (runTest
 #     {
@@ -172,4 +152,4 @@ runWrapperTests2 self.wrappers.direnv
 #       ]
 #     )
 #   )
-# ]
+]

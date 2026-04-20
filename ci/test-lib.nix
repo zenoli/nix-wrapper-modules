@@ -13,7 +13,7 @@ let
       (${cond}) || (echo "${message}" >&2; return 1)
     '';
 
-  runTests2 =
+  runTests =
     {
       name,
       context ? { },
@@ -33,7 +33,7 @@ let
     else
       lib.trace "Skipping test..." null;
 
-  runWrapperTests2 =
+  runWrapperTests =
     wrapperModule:
     tests:
     let
@@ -55,13 +55,13 @@ let
       cond = ctx: builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms;
       
     in 
-      runTests2 { 
+      runTests { 
         inherit name context contextFn cond;
         defaultContext = "wrapper";
       } tests;
 
   # generic runTest
-  runTest2 =
+  runTest =
     { name, context }:
     assertions: contextFn: defaultContext:
     let
@@ -122,78 +122,75 @@ let
   #   '';
 
   # runWrapperTests
-  runTests =
-    settings: tests:
-    let
-      wrapperModule = settings.wrapperModule;
-      wrapper = wrapperModule.apply { inherit pkgs; };
-      name = settings.name or "${wrapper.binName}-test";
-      cond = ctx: (builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms);
-    in
-    runTests2 {
-      inherit name cond;
-      context = { inherit wrapperModule wrapper; };
-    } tests;
-
-  runTest =
-    nameOrSettings: assertions: wrapper:
-    let
-      settings =
-        if (lib.isAttrs nameOrSettings) && (nameOrSettings ? name) then
-          nameOrSettings
-        else if lib.isString nameOrSettings then
-          {
-            name = nameOrSettings;
-          }
-        else
-          throw ''
-            Invalid argument for `runTest`.
-            The first argument must be either a string (the test name) or an attrs
-            matching { name, config ? { } }, but got:
-
-            ${lib.toJSON nameOrSettings}
-          '';
-    in
-    runTestWithConfig settings assertions wrapper;
-
-  runTestWithConfig =
-    {
-      name,
-      config ? { },
-    }:
-    assertions: wrapper:
-    let
-      wrapperWithConfig = wrapper.wrap config;
-      assertions' =
-        if lib.isFunction assertions then
-          # Shorthand notation (wrapper: assertions)
-          if lib.functionArgs assertions == { } then
-            assertions wrapperWithConfig
-          else
-            assertions {
-              wrapper = wrapperWithConfig;
-              config = wrapperWithConfig.passthru.configuration;
-            }
-        else
-          assertions;
-    in
-    ''
-      run() {
-        ${lib.concatMapStringsSep " && " (a: "(${a})") (lib.toList assertions')}
-      }
-
-      run || (echo 'test "${name}" failed' >&2 && exit 1)
-    '';
+  # runTests =
+  #   settings: tests:
+  #   let
+  #     wrapperModule = settings.wrapperModule;
+  #     wrapper = wrapperModule.apply { inherit pkgs; };
+  #     name = settings.name or "${wrapper.binName}-test";
+  #     cond = ctx: (builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms);
+  #   in
+  #   runTests2 {
+  #     inherit name cond;
+  #     context = { inherit wrapperModule wrapper; };
+  #   } tests;
+  #
+  # runTest =
+  #   nameOrSettings: assertions: wrapper:
+  #   let
+  #     settings =
+  #       if (lib.isAttrs nameOrSettings) && (nameOrSettings ? name) then
+  #         nameOrSettings
+  #       else if lib.isString nameOrSettings then
+  #         {
+  #           name = nameOrSettings;
+  #         }
+  #       else
+  #         throw ''
+  #           Invalid argument for `runTest`.
+  #           The first argument must be either a string (the test name) or an attrs
+  #           matching { name, config ? { } }, but got:
+  #
+  #           ${lib.toJSON nameOrSettings}
+  #         '';
+  #   in
+  #   runTestWithConfig settings assertions wrapper;
+  #
+  # runTestWithConfig =
+  #   {
+  #     name,
+  #     config ? { },
+  #   }:
+  #   assertions: wrapper:
+  #   let
+  #     wrapperWithConfig = wrapper.wrap config;
+  #     assertions' =
+  #       if lib.isFunction assertions then
+  #         # Shorthand notation (wrapper: assertions)
+  #         if lib.functionArgs assertions == { } then
+  #           assertions wrapperWithConfig
+  #         else
+  #           assertions {
+  #             wrapper = wrapperWithConfig;
+  #             config = wrapperWithConfig.passthru.configuration;
+  #           }
+  #       else
+  #         assertions;
+  #   in
+  #   ''
+  #     run() {
+  #       ${lib.concatMapStringsSep " && " (a: "(${a})") (lib.toList assertions')}
+  #     }
+  #
+  #     run || (echo 'test "${name}" failed' >&2 && exit 1)
+  #   '';
 in
 {
   inherit
     createAssertion
     runTests
     runTest
-    runWrapperTests2
-    runTests2
-    runTest2
-    runTestWithConfig
+    runWrapperTests
     ;
   isDirectory =
     path:
