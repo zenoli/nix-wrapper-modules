@@ -18,11 +18,12 @@ let
       name,
       context ? { },
       contextFn ? globalCtx: localCtx: globalCtx // localCtx,
+      defaultContext ? null,
       cond ? (ctx: true),
     }:
     tests:
     let
-      testsWithContext = lib.map (test: test (contextFn context)) tests;
+      testsWithContext = lib.map (test: test (contextFn context) defaultContext) tests;
     in
     if cond context then
       lib.trace "Running test!" runCommand name { } ''
@@ -44,7 +45,6 @@ let
         (
           let
             wrapper = globalCtx.wrapper.wrap localCtx.config;
-            # TODO: Which wrapper is read here?
             config = wrapper.passthru.configuration;
           in
           {
@@ -55,15 +55,31 @@ let
       cond = ctx: builtins.elem stdenv.hostPlatform.system ctx.wrapper.meta.platforms;
       
     in 
-      runTests2 { inherit name context contextFn cond; } tests;
+      runTests2 { 
+        inherit name context contextFn cond;
+        defaultContext = "wrapper";
+      } tests;
 
   # generic runTest
   runTest2 =
     { name, context }:
-    assertions: contextFn:
+    assertions: contextFn: defaultContext:
     let
       mergedContext = contextFn context;
-      assertions' = assertions mergedContext;
+      # assertions' = assertions 
+      # (if defaultContext == null then 
+      #   mergedContext
+      # else
+      #   mergedContext."${defaultContext}");
+      assertions' =
+        if lib.isFunction assertions then
+          # Shorthand notation (wrapper: assertions)
+          if lib.functionArgs assertions == { } && defaultContext != null then
+            assertions mergedContext."${defaultContext}"
+          else
+            assertions mergedContext
+        else
+          assertions;
     in
     ''
       run() {

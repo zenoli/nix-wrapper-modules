@@ -36,7 +36,7 @@ runWrapperTests2 self.wrappers.direnv
         };
       }
       (
-        { wrapper, ... }:
+        wrapper:
         [
           (isDirectory (getDotdir wrapper))
           (isFile "${getDotdir wrapper}/lib/nix-direnv.sh")
