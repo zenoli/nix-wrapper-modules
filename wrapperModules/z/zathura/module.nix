@@ -53,6 +53,15 @@ in
         for the full list of options.
       '';
     };
+    extraSettings = lib.mkOption {
+      type = lib.types.lines;
+      default = "";
+      description = ''
+        Extra lines appended to zathurarc, e.g.
+        `"include /home/user/.config/zathura/zathura-colors"`
+        See {manpage}`zathurarc(5)` for the full list of options.
+      '';
+    };
     mappings = lib.mkOption {
       type = with lib.types; attrsOf str;
       default = { };
@@ -72,6 +81,7 @@ in
         zathura_cb
         zathura_djvu
         zathura_ps
+        zathura_pdf_mupdf
       ];
       description = ''
         Add plugins to zathura runtime.
@@ -96,9 +106,12 @@ in
     wrapperVariants.zathura-sandbox = lib.mkIf pkgs.stdenv.hostPlatform.isLinux { };
     constructFiles.renderedRc = {
       relPath = "config/${config.binName}rc";
-      content = lib.concatStringsSep "\n" (
-        lib.mapAttrsToList formatLine config.settings ++ lib.mapAttrsToList formatMapLine config.mappings
-      );
+      content = ''
+        ${lib.concatStringsSep "\n" (
+          lib.mapAttrsToList formatLine config.settings ++ lib.mapAttrsToList formatMapLine config.mappings
+        )}
+        ${config.extraSettings}
+      '';
     };
     meta.maintainers = [ wlib.maintainers.rachitvrma ];
   };

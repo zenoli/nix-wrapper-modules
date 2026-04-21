@@ -10,7 +10,7 @@ let
     settings = {
       binds = {
         "Mod+T".spawn-sh = "alacritty";
-        "Mod+J".focus-column-or-monitor-left = null;
+        "Mod+J".focus-column-or-monitor-left = _: { };
         "Mod+N".spawn = [
           "alacritty"
           "msg"
@@ -50,7 +50,7 @@ let
       ];
 
       layout = {
-        focus-ring.off = null;
+        focus-ring.off = _: { };
         border = {
           width = 3;
           active-color = "#f5c2e7";
@@ -69,20 +69,20 @@ let
         "foo" = {
           open-on-output = "DP-3";
         };
-        "bar" = null;
+        "bar" = _: { };
       };
 
       outputs = {
         "DP-3" = {
-          position = {
-            _attrs = {
+          position = _: {
+            props = {
               x = 1440;
               y = 1080;
             };
           };
           background-color = "#003300";
           hot-corners = {
-            off = null;
+            off = _: { };
           };
         };
       };
@@ -94,6 +94,12 @@ let
           "build"
         ]
       ];
+
+      spawn-sh-at-startup = [
+        "sleep 1 && echo 'hello world'"
+        "kitty"
+      ];
+
       hotkey-overlay.skip-at-startup = [ ];
       prefer-no-csd = true;
       overview.zoom = 0.25;
