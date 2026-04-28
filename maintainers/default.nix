@@ -66,11 +66,6 @@
     github = "zenoli";
     githubId = 8073528;
   };
-  zenoli = {
-    name = "Zenoli";
-    github = "zenoli";
-    githubId = 8073528;
-  };
   pengolord = {
     name = "pengo";
     email = "pbalternates@gmail.com";
