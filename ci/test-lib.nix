@@ -80,11 +80,23 @@ let
       renderAssertions =
         assertions: lib.concatMapStringsSep " &&\n" (a: "(${renderAssertion a})") assertions;
 
+      isAssertion =
+        x:
+        lib.isString x
+        || (
+          lib.isAttrs x
+          &&
+            lib.attrNames x == [
+              "cond"
+              "msg"
+            ]
+        );
+
       renderNode =
         node:
         let
           block =
-            if !(lib.isAttrs node) then
+            if lib.isList node || isAssertion node then
               renderAssertions (lib.toList node)
             else
               lib.concatMapAttrsStringSep " &&\n" (name: childNode: ''
@@ -137,12 +149,11 @@ in
     where:
 
     ```
-    TestSet :: attrsOf (TestSet | Test)
+    TestSet :: Test | attrsOf (TestSet | Test)
 
-    Test :: [ Assertion ]
+    Test :: Assertion | [ Assertion ]
 
-    Assertion :: String | { cond :: String; msg :: String; }
-    ```
+    Assertion :: String | { cond :: String; msg :: String; }    ```
 
     # Arguments
 
