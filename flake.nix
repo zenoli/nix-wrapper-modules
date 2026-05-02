@@ -33,6 +33,9 @@
       ) self.lib.wrapperModules;
       homeModules = self.nixosModules;
       hjemModules = self.nixosModules;
+      packages = forAllSystems (
+        system: lib.mapAttrs (_: cfg: cfg.wrap { pkgs = getPkgs system; }) self.wrappers
+      );
       devShells = forAllSystems (system: {
         default = import ./shell.nix { pkgs = getPkgs system; };
       });
