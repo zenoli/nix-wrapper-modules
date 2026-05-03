@@ -298,7 +298,7 @@ in
     : Basic regular expression to search for.
   */
   fileContains = file: pattern: {
-    cond = ''grep -q '${pattern}' "${file}"'';
+    cond = ''grep -q -- '${pattern}' "${file}"'';
     msg = "Pattern '${pattern}' not found in ${file}";
   };
 
