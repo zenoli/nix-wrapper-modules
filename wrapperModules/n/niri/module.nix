@@ -363,6 +363,15 @@ in
         as nix no longer needs to know about this path at build time.
       '';
     };
+    disableConfigHotReload = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        When `true`, the wrapper will not hot reload niri with the new config on rebuild.
+
+        Note: Niri 26.04 is required for this functionality.
+      '';
+    };
   };
   config.filesToPatch = [
     "share/applications/*.desktop"
@@ -410,6 +419,21 @@ in
         + "\n"
         + config.settings.extraConfig;
   };
+  config.buildCommand.niriReloadConfig =
+    lib.mkIf (!config.disableConfigHotReload && lib.versionAtLeast config.package.version "26.04")
+      {
+        after = [ "symlinkScript" ];
+        data = ''
+          chmod +w ${placeholder config.outputName}/share/systemd/user/niri.service
+          cat >> ${placeholder config.outputName}/share/systemd/user/niri.service<<EOF
+          [Unit]
+          X-Reload-Triggers=${config.constructFiles.generatedConfig.path}
+          [Service]
+          ExecReload=${lib.getExe config.package} msg action load-config-file --path ${config.constructFiles.generatedConfig.path}
+          X-ReloadIfChanged=true
+          EOF
+        '';
+      };
   config.meta.maintainers = [
     wlib.maintainers.patwid
   ];
