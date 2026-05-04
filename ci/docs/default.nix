@@ -68,19 +68,26 @@ in
       echo "$(echo "$decoded" | jq -r '.value')" > "$generated/module_docs/$(echo "$decoded" | jq -r '.key').md"
     done
   '';
-  config.drv.module_docs = builtins.mapAttrs (buildModuleDocs {
-    prefix = "wlib.modules.";
-    package = pkgs.hello;
-    includeCore = false;
-    inherit (config) warningsAreErrors;
-    moduleStartsOpen = _: _: true;
-    descriptionStartsOpen =
-      _: _: _:
-      true;
-    descriptionIncluded =
-      _: _: _:
-      true;
-  }) wlib.modules;
+  config.drv.module_docs =
+    let
+      defaultSubModules = removeAttrs wlib.modules [ "default" ];
+      commonArgs = {
+        prefix = "wlib.modules.";
+        package = pkgs.hello;
+        includeCore = false;
+        inherit (config) warningsAreErrors;
+        moduleStartsOpen = _: _: true;
+        descriptionStartsOpen = _: _: _: true;
+        descriptionIncluded = _: _: _: true;
+      };
+    in
+    builtins.mapAttrs (buildModuleDocs commonArgs) wlib.modules
+    // {
+      default = buildModuleDocs (commonArgs // {
+        excludeFiles = builtins.attrValues defaultSubModules;
+        warningsAreErrors = false;
+      }) "default" wlib.modules.default;
+    };
   config.drv.wrapper_docs = builtins.mapAttrs (buildModuleDocs {
     prefix = "wlib.wrapperModules.";
     includeCore = false;
@@ -186,6 +193,15 @@ in
         data = "numbered";
         path = "modules/default.md";
         src = "${placeholder "generated"}/module_docs/default.md";
+        subchapters = lib.pipe config.drv.module_docs [
+          (v: removeAttrs v [ "default" ])
+          (lib.mapAttrsToList (n: _: {
+            name = "`wlib.modules.${n}`";
+            data = "numbered";
+            path = "modules/${n}.md";
+            src = "${placeholder "generated"}/module_docs/${n}.md";
+          }))
+        ];
       }
       {
         name = "Helper Modules";
@@ -193,9 +209,8 @@ in
         path = "md/helper-modules.md";
         src = ./md/helper-modules.md;
         subchapters = lib.pipe config.drv.module_docs [
-          (v: removeAttrs v [ "default" ])
-          builtins.attrNames
-          (map (n: {
+          (v: removeAttrs v (builtins.attrNames wlib.modules))
+          (lib.mapAttrsToList (n: _: {
             name = n;
             data = "numbered";
             path = "modules/${n}.md";
