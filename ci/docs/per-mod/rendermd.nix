@@ -106,39 +106,41 @@ let
     let
       moduleNotes = extraModuleNotes i mod;
     in
-    lib.optionalString (mod.visible or [ ] != [ ]) ''
-      ## ${nameFromModule mod}
-      ${lib.optionalString (builtins.isString moduleNotes && moduleNotes != "") "\n${moduleNotes}\n"}
-      ${lib.optionalString (mod.description.pre or "" != "" && descriptionIncluded "pre" i mod) ''
-        <details${if descriptionStartsOpen "pre" i mod then " open" else ""}>
-          <summary></summary>
+    lib.optionalString
+      (mod.visible or [ ] != [ ] || mod.description.pre or "" != "" || mod.description.post or "" != "")
+      ''
+        ## ${nameFromModule mod}
+        ${lib.optionalString (builtins.isString moduleNotes && moduleNotes != "") "\n${moduleNotes}\n"}
+        ${lib.optionalString (mod.description.pre or "" != "" && descriptionIncluded "pre" i mod) ''
+          <details${if descriptionStartsOpen "pre" i mod then " open" else ""}>
+            <summary></summary>
 
-        ${mod.description.pre}
+          ${mod.description.pre}
 
-        </details>
+          </details>
 
-      ''}
-      ${lib.optionalString (mod.visible or [ ] != [ ]) ''
-        <details${if moduleStartsOpen i mod then " open" else ""}>
-          <summary></summary>
+        ''}
+        ${lib.optionalString (mod.visible or [ ] != [ ]) ''
+          <details${if moduleStartsOpen i mod then " open" else ""}>
+            <summary></summary>
 
-        ${lib.pipe mod.visible [
-          (map renderOption)
-          (builtins.concatStringsSep "\n\n")
-        ]}
+          ${lib.pipe mod.visible [
+            (map renderOption)
+            (builtins.concatStringsSep "\n\n")
+          ]}
 
-        </details>
-      ''}
-      ${lib.optionalString (mod.description.post or "" != "" && descriptionIncluded "post" i mod) ''
+          </details>
+        ''}
+        ${lib.optionalString (mod.description.post or "" != "" && descriptionIncluded "post" i mod) ''
 
-        <details${if descriptionStartsOpen "post" i mod then " open" else ""}>
-          <summary></summary>
+          <details${if descriptionStartsOpen "post" i mod then " open" else ""}>
+            <summary></summary>
 
-        ${mod.description.post}
+          ${mod.description.post}
 
-        </details>
-      ''}
-    '';
+          </details>
+        ''}
+      '';
 in
 builtins.unsafeDiscardStringContext (
   builtins.concatStringsSep "\n\n" (lib.imap1 renderModule normed)

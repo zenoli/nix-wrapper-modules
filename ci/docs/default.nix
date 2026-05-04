@@ -77,16 +77,23 @@ in
         includeCore = false;
         inherit (config) warningsAreErrors;
         moduleStartsOpen = _: _: true;
-        descriptionStartsOpen = _: _: _: true;
-        descriptionIncluded = _: _: _: true;
+        descriptionStartsOpen =
+          _: _: _:
+          true;
+        descriptionIncluded =
+          _: _: _:
+          true;
       };
     in
     builtins.mapAttrs (buildModuleDocs commonArgs) wlib.modules
     // {
-      default = buildModuleDocs (commonArgs // {
-        excludeFiles = builtins.attrValues defaultSubModules;
-        warningsAreErrors = false;
-      }) "default" wlib.modules.default;
+      default = buildModuleDocs (
+        commonArgs
+        // {
+          excludeFiles = builtins.attrValues defaultSubModules;
+          warningsAreErrors = false;
+        }
+      ) "default" wlib.modules.default;
     };
   config.drv.wrapper_docs = builtins.mapAttrs (buildModuleDocs {
     prefix = "wlib.wrapperModules.";
@@ -195,12 +202,14 @@ in
         src = "${placeholder "generated"}/module_docs/default.md";
         subchapters = lib.pipe config.drv.module_docs [
           (v: removeAttrs v [ "default" ])
-          (lib.mapAttrsToList (n: _: {
-            name = "`wlib.modules.${n}`";
-            data = "numbered";
-            path = "modules/${n}.md";
-            src = "${placeholder "generated"}/module_docs/${n}.md";
-          }))
+          (lib.mapAttrsToList (
+            n: _: {
+              name = "`wlib.modules.${n}`";
+              data = "numbered";
+              path = "modules/${n}.md";
+              src = "${placeholder "generated"}/module_docs/${n}.md";
+            }
+          ))
         ];
       }
       {
@@ -210,12 +219,14 @@ in
         src = ./md/helper-modules.md;
         subchapters = lib.pipe config.drv.module_docs [
           (v: removeAttrs v (builtins.attrNames wlib.modules))
-          (lib.mapAttrsToList (n: _: {
-            name = n;
-            data = "numbered";
-            path = "modules/${n}.md";
-            src = "${placeholder "generated"}/module_docs/${n}.md";
-          }))
+          (lib.mapAttrsToList (
+            n: _: {
+              name = n;
+              data = "numbered";
+              path = "modules/${n}.md";
+              src = "${placeholder "generated"}/module_docs/${n}.md";
+            }
+          ))
         ];
       }
       {

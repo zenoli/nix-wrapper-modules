@@ -174,17 +174,25 @@ in
 lib.pipe modules-by-meta [
   (builtins.concatMap (
     v:
-    lib.optional (internal ? "${v.file}" || hidden ? "${v.file}" || visible ? "${v.file}") (
-      v
-      // {
-        ${if internal ? "${v.file}" then "internal" else null} =
-          internal.${v.file} ++ lib.optional (v.file == anon_name) (internal.${anon_name} or [ ]);
-        ${if hidden ? "${v.file}" then "hidden" else null} =
-          hidden.${v.file} ++ lib.optional (v.file == anon_name) (hidden.${anon_name} or [ ]);
-        ${if visible ? "${v.file}" then "visible" else null} =
-          visible.${v.file} ++ lib.optional (v.file == anon_name) (visible.${anon_name} or [ ]);
-      }
-    )
+    lib.optional
+      (
+        internal ? "${v.file}"
+        || hidden ? "${v.file}"
+        || visible ? "${v.file}"
+        || v.description.pre or "" != ""
+        || v.description.post or "" != ""
+      )
+      (
+        v
+        // {
+          ${if internal ? "${v.file}" then "internal" else null} =
+            internal.${v.file} ++ lib.optional (v.file == anon_name) (internal.${anon_name} or [ ]);
+          ${if hidden ? "${v.file}" then "hidden" else null} =
+            hidden.${v.file} ++ lib.optional (v.file == anon_name) (hidden.${anon_name} or [ ]);
+          ${if visible ? "${v.file}" then "visible" else null} =
+            visible.${v.file} ++ lib.optional (v.file == anon_name) (visible.${anon_name} or [ ]);
+        }
+      )
   ))
   (
     normed:
