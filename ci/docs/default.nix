@@ -13,6 +13,7 @@ let
       title ? null,
       package ? null,
       includeCore ? true,
+      excludeFiles ? [ ],
       descriptionStartsOpen ? null,
       descriptionIncluded ? null,
       moduleStartsOpen ? null,
@@ -30,7 +31,7 @@ let
         }
       ]
       // {
-        inherit includeCore warningsAreErrors;
+        inherit includeCore warningsAreErrors excludeFiles;
         ${if descriptionStartsOpen != null then "descriptionStartsOpen" else null} = descriptionStartsOpen;
         ${if descriptionIncluded != null then "descriptionIncluded" else null} = descriptionIncluded;
         ${if moduleStartsOpen != null then "moduleStartsOpen" else null} = moduleStartsOpen;
@@ -82,6 +83,8 @@ in
   }) wlib.modules;
   config.drv.wrapper_docs = builtins.mapAttrs (buildModuleDocs {
     prefix = "wlib.wrapperModules.";
+    includeCore = false;
+    excludeFiles = builtins.attrValues wlib.modules;
     inherit (config) warningsAreErrors;
   }) wlib.wrapperModules;
   config.drv.core_docs = buildModuleDocs {
@@ -98,7 +101,11 @@ in
         title = "nix-wrapper-modules";
         description = "Make wrapper derivations with the module system! Use the existing modules, or write your own!";
       };
-      output.html.git-repository-url = "https://github.com/BirdeeHub/nix-wrapper-modules";
+      output.html = {
+        git-repository-url = "https://github.com/BirdeeHub/nix-wrapper-modules";
+        fold.enable = true;
+        fold.level = 0;
+      };
     };
     summary = [
       {

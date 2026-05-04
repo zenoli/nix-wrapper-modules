@@ -9,6 +9,7 @@
 {
   options,
   includeCore ? true,
+  excludeFiles ? [ ],
   transform ? null,
   prefix ? false,
   warningsAreErrors ? true,
@@ -59,6 +60,7 @@ let
           transform
           prefix
           includeCore
+          excludeFiles
           ;
       });
   mkOptField =

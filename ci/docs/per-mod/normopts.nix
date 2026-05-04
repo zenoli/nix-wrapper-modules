@@ -8,6 +8,7 @@
   prefix ? false,
   transform ? null,
   includeCore ? true,
+  excludeFiles ? [ ],
   ...
 }:
 let
@@ -187,10 +188,18 @@ lib.pipe modules-by-meta [
   ))
   (
     normed:
-    if builtins.isBool includeCore && includeCore == true then
-      normed
+    let
+      excludeFileStrs = map toString excludeFiles;
+      withCore =
+        if builtins.isBool includeCore && includeCore == true then
+          normed
+        else
+          builtins.filter (v: v.file != wlib.core) normed;
+    in
+    if excludeFileStrs == [ ] then
+      withCore
     else
-      builtins.filter (v: v.file != wlib.core) normed
+      builtins.filter (v: !builtins.elem (toString v.file) excludeFileStrs) withCore
   )
   (
     v:
