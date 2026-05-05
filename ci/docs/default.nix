@@ -6,7 +6,24 @@
   ...
 }:
 let
-  inherit (import ./per-mod { inherit lib wlib; }) wrapperModuleMD;
+  inherit (import ./per-mod { inherit lib wlib; }) wrapperModuleMD normWrapperDocs;
+  helperModules = removeAttrs wlib.modules [ "default" ];
+  getImportedHelperModules =
+    module:
+    let
+      evaluated = wlib.evalModule [
+        module
+        {
+          _module.check = false;
+          inherit pkgs;
+        }
+      ];
+      normedFiles = map (v: toString v.file) (normWrapperDocs {
+        options = evaluated.options;
+        includeCore = false;
+      });
+    in
+    lib.filterAttrs (n: path: builtins.elem (toString path) normedFiles) helperModules;
   buildModuleDocs =
     {
       prefix ? "",
@@ -234,12 +251,21 @@ in
         data = "numbered";
         path = "md/wrapper-modules.md";
         src = ./md/wrapper-modules.md;
-        subchapters = map (n: {
-          name = n;
-          data = "numbered";
-          path = "wrapperModules/${n}.md";
-          src = "${placeholder "generated"}/wrapper_docs/${n}.md";
-        }) (builtins.attrNames config.drv.wrapper_docs);
+        subchapters = lib.mapAttrsToList (
+          n: _:
+          {
+            name = n;
+            data = "numbered";
+            path = "wrapperModules/${n}.md";
+            src = "${placeholder "generated"}/wrapper_docs/${n}.md";
+            subchapters = lib.mapAttrsToList (m: _: {
+              name = "`wlib.modules.${m}`";
+              data = "numbered";
+              path = "wrapperModules/${n}/${m}.md";
+              src = "${placeholder "generated"}/module_docs/${m}.md";
+            }) (getImportedHelperModules wlib.wrapperModules.${n});
+          }
+        ) wlib.wrapperModules;
       }
       {
         name = "Contributing";
