@@ -118,14 +118,15 @@ in
       helperModuleFiles = lib.mapAttrs (
         _: helperModule:
         map (v: toString v.file) (normWrapperDocs {
-          options = (wlib.evalModule [
-            helperModule
-            {
-              _module.check = false;
-              inherit pkgs;
-              package = pkgs.hello;
-            }
-          ]).options;
+          options =
+            (wlib.evalModule [
+              helperModule
+              {
+                _module.check = false;
+                inherit pkgs;
+                package = pkgs.hello;
+              }
+            ]).options;
           includeCore = false;
         })
       ) helperModules;
@@ -152,8 +153,12 @@ in
             onlyFiles = helperModuleFiles.${helperName};
             inherit (config) warningsAreErrors;
             moduleStartsOpen = _: _: true;
-            descriptionStartsOpen = _: _: _: true;
-            descriptionIncluded = _: _: _: true;
+            descriptionStartsOpen =
+              _: _: _:
+              true;
+            descriptionIncluded =
+              _: _: _:
+              true;
           }
         )
       ) importedHelpers
@@ -264,7 +269,8 @@ in
             path = "modules/default.md";
             src = "${placeholder "generated"}/module_docs/default.md";
           }
-        ] ++ lib.pipe config.drv.module_docs [
+        ]
+        ++ lib.pipe config.drv.module_docs [
           (v: removeAttrs v [ "default" ])
           builtins.attrNames
           (map (n: {
@@ -280,21 +286,18 @@ in
         data = "numbered";
         path = "md/wrapper-modules.md";
         src = ./md/wrapper-modules.md;
-        subchapters = lib.mapAttrsToList (
-          n: _:
-          {
-            name = n;
+        subchapters = lib.mapAttrsToList (n: _: {
+          name = n;
+          data = "numbered";
+          path = "wrapperModules/${n}.md";
+          src = "${placeholder "generated"}/wrapper_docs/${n}.md";
+          subchapters = lib.mapAttrsToList (m: _: {
+            name = "`wlib.modules.${m}`";
             data = "numbered";
-            path = "wrapperModules/${n}.md";
-            src = "${placeholder "generated"}/wrapper_docs/${n}.md";
-            subchapters = lib.mapAttrsToList (m: _: {
-              name = "`wlib.modules.${m}`";
-              data = "numbered";
-              path = "wrapperModules/${n}/${m}.md";
-              src = "${placeholder "generated"}/wrapper_helper_docs/${n}/${m}.md";
-            }) (getImportedHelperModules wlib.wrapperModules.${n});
-          }
-        ) wlib.wrapperModules;
+            path = "wrapperModules/${n}/${m}.md";
+            src = "${placeholder "generated"}/wrapper_helper_docs/${n}/${m}.md";
+          }) (getImportedHelperModules wlib.wrapperModules.${n});
+        }) wlib.wrapperModules;
       }
       {
         name = "Contributing";
