@@ -253,17 +253,18 @@ in
         src = "${placeholder "generated"}/core.md";
       }
       {
-        name = "`wlib.modules.default`";
-        data = "numbered";
-        path = "modules/default.md";
-        src = "${placeholder "generated"}/module_docs/default.md";
-      }
-      {
         name = "Helper Modules";
         data = "numbered";
         path = "md/helper-modules.md";
         src = ./md/helper-modules.md;
-        subchapters = lib.pipe config.drv.module_docs [
+        subchapters = [
+          {
+            name = "default";
+            data = "numbered";
+            path = "modules/default.md";
+            src = "${placeholder "generated"}/module_docs/default.md";
+          }
+        ] ++ lib.pipe config.drv.module_docs [
           (v: removeAttrs v [ "default" ])
           builtins.attrNames
           (map (n: {

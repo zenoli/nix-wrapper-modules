@@ -8,7 +8,7 @@ Instead, their purpose is to create convenience options for you to use to define
 
 The example you will become most familiar with are the helper modules imported by `wlib.modules.default`
 
-`wlib.modules.default` gets its options by importing 2 other modules, `wlib.modules.symlinkScript` and `wlib.modules.makeWrapper`.
+`wlib.modules.default` gets its options by importing 3 other modules, `wlib.modules.symlinkScript`, `wlib.modules.constructFiles` and `wlib.modules.makeWrapper`.
 
 But you could choose to have modules that have different abilities!
 
