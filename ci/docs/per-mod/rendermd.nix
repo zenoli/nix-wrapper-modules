@@ -10,6 +10,7 @@
   options,
   includeCore ? true,
   excludeFiles ? [ ],
+  onlyFiles ? null,
   transform ? null,
   prefix ? false,
   warningsAreErrors ? true,
@@ -61,6 +62,7 @@ let
           prefix
           includeCore
           excludeFiles
+          onlyFiles
           ;
       });
   mkOptField =

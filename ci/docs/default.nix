@@ -31,6 +31,7 @@ let
       package ? null,
       includeCore ? true,
       excludeFiles ? [ ],
+      onlyFiles ? null,
       descriptionStartsOpen ? null,
       descriptionIncluded ? null,
       moduleStartsOpen ? null,
@@ -49,6 +50,7 @@ let
       ]
       // {
         inherit includeCore warningsAreErrors excludeFiles;
+        ${if onlyFiles != null then "onlyFiles" else null} = onlyFiles;
         ${if descriptionStartsOpen != null then "descriptionStartsOpen" else null} = descriptionStartsOpen;
         ${if descriptionIncluded != null then "descriptionIncluded" else null} = descriptionIncluded;
         ${if moduleStartsOpen != null then "moduleStartsOpen" else null} = moduleStartsOpen;
@@ -84,6 +86,13 @@ in
       decoded="$(echo "$entry" | base64 --decode)"
       echo "$(echo "$decoded" | jq -r '.value')" > "$generated/module_docs/$(echo "$decoded" | jq -r '.key').md"
     done
+    jq -r '.wrapper_helper_docs | to_entries[] | .key as $wrapper | .value | to_entries[] | {wrapper: $wrapper, helper: .key, content: .value} | @base64' "$NIX_ATTRS_JSON_FILE" | while read -r entry; do
+      decoded="$(echo "$entry" | base64 --decode)"
+      wrapper="$(echo "$decoded" | jq -r '.wrapper')"
+      helper="$(echo "$decoded" | jq -r '.helper')"
+      mkdir -p "$generated/wrapper_helper_docs/$wrapper"
+      echo "$(echo "$decoded" | jq -r '.content')" > "$generated/wrapper_helper_docs/$wrapper/$helper.md"
+    done
   '';
   config.drv.module_docs =
     let
@@ -118,6 +127,51 @@ in
     excludeFiles = builtins.attrValues wlib.modules;
     inherit (config) warningsAreErrors;
   }) wlib.wrapperModules;
+  config.drv.wrapper_helper_docs =
+    let
+      helperModuleFiles = lib.mapAttrs (
+        _: helperModule:
+        map (v: toString v.file) (normWrapperDocs {
+          options = (wlib.evalModule [
+            helperModule
+            {
+              _module.check = false;
+              inherit pkgs;
+              package = pkgs.hello;
+            }
+          ]).options;
+          includeCore = false;
+        })
+      ) helperModules;
+    in
+    lib.mapAttrs (
+      wrapperName: wrapperModule:
+      let
+        importedHelpers = getImportedHelperModules wrapperModule;
+        wrapperEval = wlib.evalModule [
+          wrapperModule
+          {
+            _module.check = false;
+            inherit pkgs;
+          }
+        ];
+      in
+      lib.mapAttrs (
+        helperName: _:
+        "# `wlib.modules.${helperName}`\n\n"
+        + wrapperModuleMD (
+          wrapperEval
+          // {
+            includeCore = false;
+            onlyFiles = helperModuleFiles.${helperName};
+            inherit (config) warningsAreErrors;
+            moduleStartsOpen = _: _: true;
+            descriptionStartsOpen = _: _: _: true;
+            descriptionIncluded = _: _: _: true;
+          }
+        )
+      ) importedHelpers
+    ) wlib.wrapperModules;
   config.drv.core_docs = buildModuleDocs {
     package = pkgs.hello;
     inherit (config) warningsAreErrors;
@@ -262,7 +316,7 @@ in
               name = "`wlib.modules.${m}`";
               data = "numbered";
               path = "wrapperModules/${n}/${m}.md";
-              src = "${placeholder "generated"}/module_docs/${m}.md";
+              src = "${placeholder "generated"}/wrapper_helper_docs/${n}/${m}.md";
             }) (getImportedHelperModules wlib.wrapperModules.${n});
           }
         ) wlib.wrapperModules;

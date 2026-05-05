@@ -9,6 +9,7 @@
   transform ? null,
   includeCore ? true,
   excludeFiles ? [ ],
+  onlyFiles ? null,
   ...
 }:
 let
@@ -198,16 +199,22 @@ lib.pipe modules-by-meta [
     normed:
     let
       excludeFileStrs = map toString excludeFiles;
+      onlyFileStrs = if onlyFiles == null then null else map toString onlyFiles;
       withCore =
         if builtins.isBool includeCore && includeCore == true then
           normed
         else
           builtins.filter (v: v.file != wlib.core) normed;
+      withExcludes =
+        if excludeFileStrs == [ ] then
+          withCore
+        else
+          builtins.filter (v: !builtins.elem (toString v.file) excludeFileStrs) withCore;
     in
-    if excludeFileStrs == [ ] then
-      withCore
+    if onlyFileStrs == null then
+      withExcludes
     else
-      builtins.filter (v: !builtins.elem (toString v.file) excludeFileStrs) withCore
+      builtins.filter (v: builtins.elem (toString v.file) onlyFileStrs) withExcludes
   )
   (
     v:
