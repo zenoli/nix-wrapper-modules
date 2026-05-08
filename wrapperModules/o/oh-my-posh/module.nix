@@ -172,15 +172,15 @@ in
                 for (( i=start+1; i<${toString n}; i++ )); do
                   curr="''${ordered_settings[$i]}"
                   if [ "$i" -eq ${toString (n - 1)} ]; then
-                    _omp_out="$2"
+                    dst="$2"
                   else
                     cfg_name=$(basename "$curr")
                     if [[ "$cfg_name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then cfg_name="''${BASH_REMATCH[1]}"; fi
-                    _omp_out="$config_chain_dir/$cfg_name"
+                    dst="$config_chain_dir/$cfg_name"
                   fi
                   tmp=$(mktemp)
-                  ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$tmp" && mv $tmp $_omp_out
-                  prev="$_omp_out"
+                  ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$tmp" && mv $tmp $dst
+                  prev="$dst"
                 done
 
                 # If the loop didn't run (last config already had "extends"), copy it directly
