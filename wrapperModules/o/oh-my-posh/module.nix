@@ -169,6 +169,9 @@ in
 
                 # If the loop didn't run (last config already had "extends"), copy it directly
                 if [ "$_omp_prev" != "$2" ]; then cp "$_omp_prev" "$2"; fi
+
+                # Remove the chain dir if nothing was written to it
+                rmdir "$_omp_chain_dir" 2>/dev/null || true
               '';
         in
         # Chains all specified JSON configs via oh-my-posh's native extends feature
