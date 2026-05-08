@@ -150,7 +150,7 @@ in
                   if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
                     _omp_out="$2"
                   else
-                    _omp_out="$_omp_chain_dir/chain-$_omp_i.json"
+                    _omp_out="$_omp_chain_dir/$(basename "$_omp_cfg")"
                   fi
 
                   _omp_has_extends=$(${jq} 'has("extends")' "$_omp_cfg")
