@@ -184,7 +184,7 @@ in
                 done
 
                 # If the loop didn't run (last config already had "extends"), copy it directly
-                if [ "$prev" != "$2" ]; then cp "$prev" "$2"; fi
+                if [ "$start" -eq ${toString (n - 1)} ]; then cp "$prev" "$2"; fi
 
                 # Remove the chain dir if nothing was written to it
                 rmdir "$config_chain_dir" 2>/dev/null || true
