@@ -113,174 +113,143 @@ test { wrapper = "oh-my-posh"; } {
   #     # 1_shell sets it to "{{ .Folder }}", jandedobbeleer overrides it to "{{ .Shell }} in {{ .Folder }}"
   #     (fileContains configFile ''"console_title_template": "{{ .Shell }} in {{ .Folder }}"'')
   #   ];
-  "config chains" = {
-    "'theme > file > settings (default order)'" =
-      let
-        wrapper = wm.wrap {
-          inherit pkgs;
-          theme = [
-            "aliens"
-            "agnoster"
-          ];
-          settings.foo = "foo";
-          configFile = writeText "file-settings.yaml" "bar: bar";
-        };
-        configChainDir = "${wrapper}/config-chain";
+  "config chains" =
+    let
+      baseWrapper = wm.wrap {
+        inherit pkgs;
+        theme = [
+          "aliens"
+          "agnoster"
+        ];
+        settings.foo = "foo";
+        configFile = writeText "file-settings.yaml" "bar: bar";
+      };
+    in
+    {
+      "'theme > file > settings (default order)'" =
+        let
+          wrapper = baseWrapper;
+          configChainDir = "${wrapper}/config-chain";
 
-        nixSettingsFile = "${wrapper}/config.json";
-        fileSettingsFile = "${configChainDir}/file-settings.json";
-        agnosterFile = "${configChainDir}/agnoster.omp.json";
-      in
-      [
-        (fileContains nixSettingsFile ''"extends": "${fileSettingsFile}"'')
-        (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
-        (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
-      ];
+          nixSettingsFile = "${wrapper}/config.json";
+          fileSettingsFile = "${configChainDir}/file-settings.json";
+          agnosterFile = "${configChainDir}/agnoster.omp.json";
+        in
+        [
+          (fileContains nixSettingsFile ''"extends": "${fileSettingsFile}"'')
+          (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
+          (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
+        ];
 
-    "'file > theme > settings'" =
-      let
-        wrapper = wm.wrap {
-          inherit pkgs;
-          order = [
-            "file"
-            "theme"
-            "settings"
-          ];
-          theme = [
-            "aliens"
-            "agnoster"
-          ];
-          settings.foo = "foo";
-          configFile = writeText "file-settings.yaml" "bar: bar";
-        };
-        configChainDir = "${wrapper}/config-chain";
+      "'file > theme > settings'" =
+        let
+          wrapper = baseWrapper.wrap {
+            order = [
+              "file"
+              "theme"
+              "settings"
+            ];
+          };
+          configChainDir = "${wrapper}/config-chain";
 
-        nixSettingsFile = "${wrapper}/config.json";
-        fileSettingsFile = "${configChainDir}/file-settings.json";
-        agnosterFile = "${configChainDir}/agnoster.omp.json";
-        aliensFile = "${configChainDir}/aliens.omp.json";
-      in
-      [
-        (fileContains nixSettingsFile ''"extends": "${agnosterFile}"'')
-        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
-        (fileContains aliensFile ''"extends": "/nix/store/.*file-settings.json"'')
-      ];
+          nixSettingsFile = "${wrapper}/config.json";
+          fileSettingsFile = "${configChainDir}/file-settings.json";
+          agnosterFile = "${configChainDir}/agnoster.omp.json";
+          aliensFile = "${configChainDir}/aliens.omp.json";
+        in
+        [
+          (fileContains nixSettingsFile ''"extends": "${agnosterFile}"'')
+          (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+          (fileContains aliensFile ''"extends": "/nix/store/.*file-settings.json"'')
+        ];
 
-    "'file > settings > theme'" =
-      let
-        wrapper = wm.wrap {
-          inherit pkgs;
-          order = [
-            "file"
-            "settings"
-            "theme"
-          ];
-          theme = [
-            "aliens"
-            "agnoster"
-          ];
-          settings.foo = "foo";
-          configFile = writeText "file-settings.yaml" "bar: bar";
-        };
-        configChainDir = "${wrapper}/config-chain";
+      "'file > settings > theme'" =
+        let
+          wrapper = baseWrapper.wrap {
+            order = [
+              "file"
+              "settings"
+              "theme"
+            ];
+          };
+          configChainDir = "${wrapper}/config-chain";
 
-        agnosterFile = "${wrapper}/config.json";
-        aliensFile = "${configChainDir}/aliens.omp.json";
-        nixSettingsFile = "${configChainDir}/settings.json";
-        fileSettingsFile = "${configChainDir}/file-settings.json";
-      in
-      [
-        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
-        (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
-        (fileContains nixSettingsFile ''"extends": "/nix/store/.*file-settings.json"'')
-      ];
+          agnosterFile = "${wrapper}/config.json";
+          aliensFile = "${configChainDir}/aliens.omp.json";
+          nixSettingsFile = "${configChainDir}/settings.json";
+          fileSettingsFile = "${configChainDir}/file-settings.json";
+        in
+        [
+          (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+          (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
+          (fileContains nixSettingsFile ''"extends": "/nix/store/.*file-settings.json"'')
+        ];
 
-    "'settings > theme > file'" =
-      let
-        wrapper = wm.wrap {
-          inherit pkgs;
-          order = [
-            "settings"
-            "theme"
-            "file"
-          ];
-          theme = [
-            "aliens"
-            "agnoster"
-          ];
-          settings.foo = "foo";
-          configFile = writeText "file-settings.yaml" "bar: bar";
-        };
-        configChainDir = "${wrapper}/config-chain";
+      "'settings > theme > file'" =
+        let
+          wrapper = baseWrapper.wrap {
+            order = [
+              "settings"
+              "theme"
+              "file"
+            ];
+          };
+          configChainDir = "${wrapper}/config-chain";
 
-        fileSettingsFile = "${wrapper}/config.json";
-        agnosterFile = "${configChainDir}/agnoster.omp.json";
-        aliensFile = "${configChainDir}/aliens.omp.json";
-        nixSettingsFile = "${configChainDir}/settings.json";
-      in
-      [
-        (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
-        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
-        (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
-      ];
+          fileSettingsFile = "${wrapper}/config.json";
+          agnosterFile = "${configChainDir}/agnoster.omp.json";
+          aliensFile = "${configChainDir}/aliens.omp.json";
+          nixSettingsFile = "${configChainDir}/settings.json";
+        in
+        [
+          (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
+          (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+          (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
+        ];
 
-    "'theme > settings > file'" =
-      let
-        wrapper = wm.wrap {
-          inherit pkgs;
-          order = [
-            "theme"
-            "settings"
-            "file"
-          ];
-          theme = [
-            "aliens"
-            "agnoster"
-          ];
-          settings.foo = "foo";
-          configFile = writeText "file-settings.yaml" "bar: bar";
-        };
-        configChainDir = "${wrapper}/config-chain";
+      "'theme > settings > file'" =
+        let
+          wrapper = baseWrapper.wrap {
+            order = [
+              "theme"
+              "settings"
+              "file"
+            ];
+          };
+          configChainDir = "${wrapper}/config-chain";
 
-        fileSettingsFile = "${wrapper}/config.json";
-        nixSettingsFile = "${configChainDir}/settings.json";
-        agnosterFile = "${configChainDir}/agnoster.omp.json";
-      in
-      [
-        (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
-        (fileContains nixSettingsFile ''"extends": "${agnosterFile}"'')
-        (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
-      ];
+          fileSettingsFile = "${wrapper}/config.json";
+          nixSettingsFile = "${configChainDir}/settings.json";
+          agnosterFile = "${configChainDir}/agnoster.omp.json";
+        in
+        [
+          (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
+          (fileContains nixSettingsFile ''"extends": "${agnosterFile}"'')
+          (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
+        ];
 
-    "'settings > file > theme'" =
-      let
-        wrapper = wm.wrap {
-          inherit pkgs;
-          order = [
-            "settings"
-            "file"
-            "theme"
-          ];
-          theme = [
-            "aliens"
-            "agnoster"
-          ];
-          settings.foo = "foo";
-          configFile = writeText "file-settings.yaml" "bar: bar";
-        };
-        configChainDir = "${wrapper}/config-chain";
+      "'settings > file > theme'" =
+        let
+          wrapper = baseWrapper.wrap {
+            order = [
+              "settings"
+              "file"
+              "theme"
+            ];
+          };
+          configChainDir = "${wrapper}/config-chain";
 
-        agnosterFile = "${wrapper}/config.json";
-        aliensFile = "${configChainDir}/aliens.omp.json";
-        fileSettingsFile = "${configChainDir}/file-settings.json";
-        nixSettingsFile = "${configChainDir}/settings.json";
-      in
-      [
-        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
-        (fileContains aliensFile ''"extends": "${fileSettingsFile}"'')
-        (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
-      ];
-  };
+          agnosterFile = "${wrapper}/config.json";
+          aliensFile = "${configChainDir}/aliens.omp.json";
+          fileSettingsFile = "${configChainDir}/file-settings.json";
+          nixSettingsFile = "${configChainDir}/settings.json";
+        in
+        [
+          (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+          (fileContains aliensFile ''"extends": "${fileSettingsFile}"'')
+          (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
+        ];
+    };
 
   "config file formats" =
     let
