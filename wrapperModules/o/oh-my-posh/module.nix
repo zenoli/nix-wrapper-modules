@@ -76,8 +76,13 @@ in
     package = lib.mkDefault pkgs.oh-my-posh;
     theme = [
       "1_shell"
-      "agnoster"
+      # "agnoster"
       "aliens"
+    ];
+    order = [ 
+      "settings"
+      "file"
+      "theme"
     ];
     configFile = ./foo.omp.json;
     settings = {
@@ -156,6 +161,20 @@ in
 
                 # Build the extends chain from _omp_start to the last config
                 _omp_prev="''${_omp_configs[$_omp_start]}"
+
+                # If _omp_prev will be embedded in an extends field and is not in
+                # the nix store (e.g. $1 from passAsFile), it won't be accessible
+                # at runtime. Copy it into config-chain to give it a stable output path.
+                if (( _omp_start < ${toString (n - 1)} )); then
+                  case "$_omp_prev" in
+                    /nix/store/*) ;;
+                    *)
+                      cp "$_omp_prev" "$_omp_chain_dir/settings.json"
+                      _omp_prev="$_omp_chain_dir/settings.json"
+                      ;;
+                  esac
+                fi
+
                 for (( _omp_i=_omp_start+1; _omp_i<${toString n}; _omp_i++ )); do
                   _omp_cfg="''${_omp_configs[$_omp_i]}"
                   if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
