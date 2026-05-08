@@ -80,9 +80,9 @@ in
       "aliens"
     ];
     order = [ 
+      "theme"
       "settings"
       "file"
-      "theme"
     ];
     configFile = ./foo.omp.json;
     settings = {
@@ -112,17 +112,25 @@ in
               isToml = lib.hasSuffix ".toml" path;
               isYaml = lib.hasSuffix ".yaml" path || lib.hasSuffix ".yml" path;
               isJson = lib.hasSuffix ".json" path;
+              baseName = lib.removeSuffix ".toml" (
+                lib.removeSuffix ".yaml" (lib.removeSuffix ".yml" (builtins.baseNameOf path))
+              );
             in
             if isJson then
               "_omp_config_json=${config.configFile}"
             else if isToml || isYaml then
               ''
-                _omp_config_json=$(mktemp --suffix=.json)
+                _omp_config_json="$_omp_chain_dir/${baseName}.json"
                 ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg path} > "$_omp_config_json"
               ''
             else
               throw "oh-my-posh: configFile must have a .json, .toml, .yaml, or .yml extension, got: ${path}"
           );
+
+          settingsNormalizationScript = lib.optionalString (config.settings != { }) ''
+            _omp_settings_json="$_omp_chain_dir/settings.json"
+            cp "$1" "$_omp_settings_json"
+          '';
 
           orderedSettings =
             let
@@ -131,22 +139,22 @@ in
                   p: lib.escapeShellArg "${config.package}/share/oh-my-posh/themes/${p}.omp.json"
                 ) config.theme;
                 ${fileKey} = lib.optional (config.configFile != null) ''"$_omp_config_json"'';
-                ${settingsKey} = lib.optional (config.settings != { }) ''"$1"'';
+                ${settingsKey} = lib.optional (config.settings != { }) ''"$_omp_settings_json"'';
               };
             in
             lib.concatMap (key: jsonSettingsMap.${key}) config.order;
           jq = "${pkgs.jq}/bin/jq";
           chainScript =
             if orderedSettings == [ ] then
-              ''echo '{}' > "$2"''
+              ''
+                echo '{}' > "$2"
+                rmdir "$_omp_chain_dir" 2>/dev/null || true
+              ''
             else
               let
                 n = builtins.length orderedSettings;
               in
               ''
-                _omp_chain_dir="$(dirname "$2")/config-chain"
-                mkdir -p "$_omp_chain_dir"
-
                 _omp_configs=(${lib.concatStringsSep " " orderedSettings})
 
                 # Scan backwards to find the rightmost config with "extends" already set.
@@ -161,20 +169,6 @@ in
 
                 # Build the extends chain from _omp_start to the last config
                 _omp_prev="''${_omp_configs[$_omp_start]}"
-
-                # If _omp_prev will be embedded in an extends field and is not in
-                # the nix store (e.g. $1 from passAsFile), it won't be accessible
-                # at runtime. Copy it into config-chain to give it a stable output path.
-                if (( _omp_start < ${toString (n - 1)} )); then
-                  case "$_omp_prev" in
-                    /nix/store/*) ;;
-                    *)
-                      cp "$_omp_prev" "$_omp_chain_dir/settings.json"
-                      _omp_prev="$_omp_chain_dir/settings.json"
-                      ;;
-                  esac
-                fi
-
                 for (( _omp_i=_omp_start+1; _omp_i<${toString n}; _omp_i++ )); do
                   _omp_cfg="''${_omp_configs[$_omp_i]}"
                   if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
@@ -182,7 +176,9 @@ in
                   else
                     _omp_out="$_omp_chain_dir/$(basename "$_omp_cfg")"
                   fi
-                  ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_out"
+                  _omp_tmp=$(mktemp "$_omp_chain_dir/.XXXXXXXXXX")
+                  ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_tmp"
+                  mv "$_omp_tmp" "$_omp_out"
                   _omp_prev="$_omp_out"
                 done
 
@@ -196,7 +192,10 @@ in
         # Chains all specified JSON configs via oh-my-posh's native extends feature
         ''
           mkdir -p "$(dirname "$2")"
+          _omp_chain_dir="$(dirname "$2")/config-chain"
+          mkdir -p "$_omp_chain_dir"
           ${jsonNormalizationScript}
+          ${settingsNormalizationScript}
           ${chainScript}
         '';
     };
