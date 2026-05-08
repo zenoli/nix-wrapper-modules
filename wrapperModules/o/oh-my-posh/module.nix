@@ -108,13 +108,45 @@ in
               };
             in
             lib.concatMap (key: jsonSettingsMap.${key}) config.order;
+          jq = "${pkgs.jq}/bin/jq";
+          chainScript =
+            if orderedSettings == [ ] then
+              ''echo '{}' > "$2"''
+            else if builtins.length orderedSettings == 1 then
+              ''cp ${builtins.head orderedSettings} "$2"''
+            else
+              let
+                n = builtins.length orderedSettings;
+              in
+              ''
+                _omp_configs=(${lib.concatStringsSep " " orderedSettings})
+                _omp_prev="''${_omp_configs[0]}"
+
+                for (( _omp_i=1; _omp_i<${toString n}; _omp_i++ )); do
+                  _omp_cfg="''${_omp_configs[$_omp_i]}"
+
+                  if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
+                    _omp_out="$2"
+                  else
+                    _omp_out=$(mktemp --suffix=.json)
+                  fi
+
+                  _omp_has_extends=$(${jq} 'has("extends")' "$_omp_cfg")
+                  if [ "$_omp_has_extends" = "true" ]; then
+                    cp "$_omp_cfg" "$_omp_out"
+                  else
+                    ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_out"
+                  fi
+
+                  _omp_prev="$_omp_out"
+                done
+              '';
         in
-        # Merges all specified JSON theme files, config file, and nix settings JSON using jq
+        # Chains all specified JSON configs via oh-my-posh's native extends feature
         ''
           mkdir -p "$(dirname "$2")"
           ${jsonNormalizationScript}
-          ${pkgs.jq}/bin/jq -s 'reduce .[] as $item ({}; . * $item)' \
-          ${lib.concatStringsSep " " orderedSettings} > "$2"
+          ${chainScript}
         '';
     };
     flags."--config" = config.constructFiles."config.json".path;
