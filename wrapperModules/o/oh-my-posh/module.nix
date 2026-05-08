@@ -74,63 +74,60 @@ in
   };
   config = {
     package = lib.mkDefault pkgs.oh-my-posh;
-    # theme = [
-    #   "1_shell"
-    #   # "agnoster"
-    #   "aliens"
-    # ];
-    # order = [
-    #   "theme"
-    #   "file"
-    #   "settings"
-    # ];
-    # configFile = ./foo.omp.json;
-    # settings = {
-    #   streaming = 40;
-    #   # extends = "foo";
-    #   blocks = [
-    #     {
-    #       alignment = "left";
-    #       type = "prompt";
-    #       segments = [
-    #         {
-    #           type = "root";
-    #           template = "oli";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    # };
+    theme = [
+      "1_shell"
+      # "agnoster"
+      "aliens"
+    ];
+    order = [
+      "theme"
+      "file"
+      "settings"
+    ];
+    configFile = ./foo.omp.yaml;
+    settings = {
+      streaming = 40;
+      # extends = "foo";
+      blocks = [
+        {
+          alignment = "left";
+          type = "prompt";
+          segments = [
+            {
+              type = "root";
+              template = "oli";
+            }
+          ];
+        }
+      ];
+    };
     constructFiles."config.json" = {
-      content = builtins.toJSON config.settings;
       relPath = "config.json";
       builder =
         let
-          jsonNormalizationScript = lib.optionalString (config.configFile != null) (
-            let
-              path = toString config.configFile;
-              isToml = lib.hasSuffix ".toml" path;
-              isYaml = lib.hasSuffix ".yaml" path || lib.hasSuffix ".yml" path;
-              isJson = lib.hasSuffix ".json" path;
-              baseName = lib.removeSuffix ".toml" (
-                lib.removeSuffix ".yaml" (lib.removeSuffix ".yml" (builtins.baseNameOf path))
-              );
-            in
-            if isJson then
-              "_omp_config_json=${config.configFile}"
-            else if isToml || isYaml then
-              ''
-                _omp_config_json="$config_chain_dir/${baseName}.json"
-                ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg path} > "$_omp_config_json"
-              ''
-            else
-              throw "oh-my-posh: configFile must have a .json, .toml, .yaml, or .yml extension, got: ${path}"
-          );
+          nixSettingsFile = pkgs.writeText "settings.json" (builtins.toJSON config.settings);
 
-          settingsNormalizationScript = lib.optionalString (config.settings != { }) ''
-            _omp_settings_json="$config_chain_dir/settings.json"
-            cp "$1" "$_omp_settings_json"
-          '';
+          normalizedConfigFile =
+            if config.configFile == null then
+              null
+            else
+              let
+                path = toString config.configFile;
+                isJson = lib.hasSuffix ".json" path;
+                isToml = lib.hasSuffix ".toml" path;
+                isYaml = lib.hasSuffix ".yaml" path || lib.hasSuffix ".yml" path;
+                jsonName =
+                  lib.removeSuffix ".toml" (lib.removeSuffix ".yaml" (lib.removeSuffix ".yml" (builtins.baseNameOf path)))
+                  + ".json";
+              in
+              if isJson then
+                config.configFile
+              else if isToml || isYaml then
+                pkgs.runCommand jsonName { } ''
+                  ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg "${config.configFile}"} > $out
+                ''
+              else
+                throw "oh-my-posh: configFile must have a .json, .toml, .yaml, or .yml extension, got: ${path}";
 
           orderedSettings =
             let
@@ -138,8 +135,8 @@ in
                 ${themeKey} = map (
                   p: lib.escapeShellArg "${config.package}/share/oh-my-posh/themes/${p}.omp.json"
                 ) config.theme;
-                ${fileKey} = lib.optional (config.configFile != null) ''"$_omp_config_json"'';
-                ${settingsKey} = lib.optional (config.settings != { }) ''"$_omp_settings_json"'';
+                ${fileKey} = lib.optional (config.configFile != null) "${normalizedConfigFile}";
+                ${settingsKey} = lib.optional (config.settings != { }) "${nixSettingsFile}";
               };
             in
             lib.concatMap (key: jsonSettingsMap.${key}) config.order;
@@ -152,7 +149,7 @@ in
               ''
             else
               let
-                n = builtins.length orderedSettings;
+                n = builtins.trace (lib.concatStringsSep "\n" orderedSettings) (builtins.length orderedSettings);
               in
               ''
                 ordered_settings=(${lib.concatStringsSep " " orderedSettings})
@@ -167,6 +164,12 @@ in
                   fi
                 done
 
+                get_name() {
+                  name=$(basename "$1")
+                  if [[ "$name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then name="''${BASH_REMATCH[1]}"; fi
+                  echo $name
+                }
+
                 # Build the extends chain from start to the last config
                 prev="''${ordered_settings[$start]}"
                 for (( i=start+1; i<${toString n}; i++ )); do
@@ -174,9 +177,7 @@ in
                   if [ "$i" -eq ${toString (n - 1)} ]; then
                     dst="$2"
                   else
-                    cfg_name=$(basename "$curr")
-                    if [[ "$cfg_name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then cfg_name="''${BASH_REMATCH[1]}"; fi
-                    dst="$config_chain_dir/$cfg_name"
+                    dst="$config_chain_dir/$(get_name $curr)"
                   fi
                   tmp=$(mktemp)
                   ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$tmp" && mv $tmp $dst
@@ -195,8 +196,6 @@ in
           mkdir -p "$(dirname "$2")"
           config_chain_dir="$(dirname "$2")/config-chain"
           mkdir -p "$config_chain_dir"
-          ${jsonNormalizationScript}
-          ${settingsNormalizationScript}
           ${chainScript}
         '';
     };
