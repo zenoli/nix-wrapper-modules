@@ -74,38 +74,45 @@ in
   };
   config = {
     package = lib.mkDefault pkgs.oh-my-posh;
-    theme = [
-      "1_shell"
-      # "agnoster"
-      "aliens"
-    ];
-    order = [
-      "theme"
-      "settings"
-      "file"
-    ];
-    configFile = ./file-settings.json;
-    settings = {
-      streaming = 40;
-      # extends = "foo";
-      blocks = [
-        {
-          alignment = "left";
-          type = "prompt";
-          segments = [
-            {
-              type = "root";
-              template = "oli";
-            }
-          ];
-        }
-      ];
-    };
+    # theme = [
+    #   "1_shell"
+    #   # "agnoster"
+    #   "aliens"
+    # ];
+    # order = [
+    #   "theme"
+    #   "settings"
+    #   "file"
+    # ];
+    # configFile = ./file-settings.json;
+    # settings = {
+    #   streaming = 40;
+    #   # extends = "foo";
+    #   blocks = [
+    #     {
+    #       alignment = "left";
+    #       type = "prompt";
+    #       segments = [
+    #         {
+    #           type = "root";
+    #           template = "oli";
+    #         }
+    #       ];
+    #     }
+    #   ];
+    # };
     constructFiles."config.json" = {
       relPath = "config.json";
       builder =
         let
           nixSettingsFile = pkgs.writeText "settings.json" (builtins.toJSON config.settings);
+
+          stripStoreHash =
+            name:
+            let
+              m = builtins.match "[a-z0-9]{32}-(.*)" name;
+            in
+            if m != null then builtins.head m else name;
 
           normalizedConfigFile =
             if config.configFile == null then
@@ -113,23 +120,22 @@ in
             else
               let
                 path = toString config.configFile;
-                baseName =
-                  let
-                    b = builtins.baseNameOf path;
-                    m = builtins.match "[a-z0-9]{32}-(.*)" b;
-                  in
-                  if m != null then builtins.head m else b;
+                baseName = stripStoreHash (builtins.baseNameOf path);
                 isJson = lib.hasSuffix ".json" baseName;
                 isToml = lib.hasSuffix ".toml" baseName;
                 isYaml = lib.hasSuffix ".yaml" baseName || lib.hasSuffix ".yml" baseName;
-                jsonName =
-                  lib.removeSuffix ".toml" (lib.removeSuffix ".yaml" (lib.removeSuffix ".yml" baseName))
-                  + ".json";
               in
               if isJson then
                 config.configFile
               else if isToml || isYaml then
-                pkgs.runCommand jsonName { } ''
+                let
+                  configFileName = lib.pipe baseName [
+                    (lib.removeSuffix ".toml")
+                    (lib.removeSuffix ".yaml")
+                    (lib.removeSuffix ".yml")
+                  ];
+                in
+                pkgs.runCommand "${configFileName}.json" { } ''
                   ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg "${config.configFile}"} > $out
                 ''
               else
@@ -146,6 +152,7 @@ in
               };
             in
             lib.concatMap (key: jsonSettingsMap.${key}) config.order;
+
           jq = "${pkgs.jq}/bin/jq";
           chainScript =
             if orderedSettings == [ ] then
