@@ -81,8 +81,8 @@ in
     ];
     order = [ 
       "theme"
-      "settings"
       "file"
+      "settings"
     ];
     configFile = ./foo.omp.json;
     settings = {
@@ -174,7 +174,9 @@ in
                   if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
                     _omp_out="$2"
                   else
-                    _omp_out="$_omp_chain_dir/$(basename "$_omp_cfg")"
+                    _omp_name=$(basename "$_omp_cfg")
+                    if [[ "$_omp_name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then _omp_name="''${BASH_REMATCH[1]}"; fi
+                    _omp_out="$_omp_chain_dir/$_omp_name"
                   fi
                   _omp_tmp=$(mktemp "$_omp_chain_dir/.XXXXXXXXXX")
                   ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_tmp"
