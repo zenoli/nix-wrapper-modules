@@ -178,9 +178,8 @@ in
                     if [[ "$cfg_name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then cfg_name="''${BASH_REMATCH[1]}"; fi
                     _omp_out="$config_chain_dir/$cfg_name"
                   fi
-                  _omp_tmp=$(mktemp "$config_chain_dir/.XXXXXXXXXX")
-                  ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$_omp_tmp"
-                  mv "$_omp_tmp" "$_omp_out"
+                  tmp=$(mktemp)
+                  ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$tmp" && mv $tmp $_omp_out
                   prev="$_omp_out"
                 done
 
