@@ -74,33 +74,33 @@ in
   };
   config = {
     package = lib.mkDefault pkgs.oh-my-posh;
-    # theme = [
-    #   "1_shell"
-    #   # "agnoster"
-    #   "aliens"
-    # ];
-    # order = [
-    #   "theme"
-    #   "file"
-    #   "settings"
-    # ];
-    # configFile = ./file-settings.json;
-    # settings = {
-    #   streaming = 40;
-    #   # extends = "foo";
-    #   blocks = [
-    #     {
-    #       alignment = "left";
-    #       type = "prompt";
-    #       segments = [
-    #         {
-    #           type = "root";
-    #           template = "oli";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    # };
+    theme = [
+      "1_shell"
+      # "agnoster"
+      "aliens"
+    ];
+    order = [
+      "theme"
+      "settings"
+      "file"
+    ];
+    configFile = ./file-settings.json;
+    settings = {
+      streaming = 40;
+      # extends = "foo";
+      blocks = [
+        {
+          alignment = "left";
+          type = "prompt";
+          segments = [
+            {
+              type = "root";
+              template = "oli";
+            }
+          ];
+        }
+      ];
+    };
     constructFiles."config.json" = {
       relPath = "config.json";
       builder =
@@ -113,15 +113,17 @@ in
             else
               let
                 path = toString config.configFile;
-                isJson = lib.hasSuffix ".json" path;
-                isToml = lib.hasSuffix ".toml" path;
-                isYaml = lib.hasSuffix ".yaml" path || lib.hasSuffix ".yml" path;
-                rawBaseName = builtins.baseNameOf path;
-                strippedBaseName =
-                  let m = builtins.match "[a-z0-9]{32}-(.*)" rawBaseName;
-                  in if m != null then builtins.head m else rawBaseName;
+                baseName =
+                  let
+                    b = builtins.baseNameOf path;
+                    m = builtins.match "[a-z0-9]{32}-(.*)" b;
+                  in
+                  if m != null then builtins.head m else b;
+                isJson = lib.hasSuffix ".json" baseName;
+                isToml = lib.hasSuffix ".toml" baseName;
+                isYaml = lib.hasSuffix ".yaml" baseName || lib.hasSuffix ".yml" baseName;
                 jsonName =
-                  lib.removeSuffix ".toml" (lib.removeSuffix ".yaml" (lib.removeSuffix ".yml" strippedBaseName))
+                  lib.removeSuffix ".toml" (lib.removeSuffix ".yaml" (lib.removeSuffix ".yml" baseName))
                   + ".json";
               in
               if isJson then
