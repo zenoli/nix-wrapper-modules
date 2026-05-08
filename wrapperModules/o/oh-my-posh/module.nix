@@ -82,7 +82,7 @@ in
     configFile = ./foo.omp.json;
     settings = {
       streaming = 40;
-      extends = "foo";
+      # extends = "foo";
       blocks = [
         {
           alignment = "left";
@@ -134,8 +134,6 @@ in
           chainScript =
             if orderedSettings == [ ] then
               ''echo '{}' > "$2"''
-            else if builtins.length orderedSettings == 1 then
-              ''cp ${builtins.head orderedSettings} "$2"''
             else
               let
                 n = builtins.length orderedSettings;
@@ -145,26 +143,32 @@ in
                 mkdir -p "$_omp_chain_dir"
 
                 _omp_configs=(${lib.concatStringsSep " " orderedSettings})
-                _omp_prev="''${_omp_configs[0]}"
 
-                for (( _omp_i=1; _omp_i<${toString n}; _omp_i++ )); do
+                # Scan backwards to find the rightmost config with "extends" already set.
+                # Configs before it are unreachable through our chain and can be skipped.
+                _omp_start=0
+                for (( _omp_i=${toString (n - 1)}; _omp_i>0; _omp_i-- )); do
+                  if [ "$(${jq} 'has("extends")' "''${_omp_configs[$_omp_i]}")" = "true" ]; then
+                    _omp_start=$_omp_i
+                    break
+                  fi
+                done
+
+                # Build the extends chain from _omp_start to the last config
+                _omp_prev="''${_omp_configs[$_omp_start]}"
+                for (( _omp_i=_omp_start+1; _omp_i<${toString n}; _omp_i++ )); do
                   _omp_cfg="''${_omp_configs[$_omp_i]}"
-
                   if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
                     _omp_out="$2"
                   else
                     _omp_out="$_omp_chain_dir/$(basename "$_omp_cfg")"
                   fi
-
-                  _omp_has_extends=$(${jq} 'has("extends")' "$_omp_cfg")
-                  if [ "$_omp_has_extends" = "true" ]; then
-                    cp "$_omp_cfg" "$_omp_out"
-                  else
-                    ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_out"
-                  fi
-
+                  ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_out"
                   _omp_prev="$_omp_out"
                 done
+
+                # If the loop didn't run (last config already had "extends"), copy it directly
+                if [ "$_omp_prev" != "$2" ]; then cp "$_omp_prev" "$2"; fi
               '';
         in
         # Chains all specified JSON configs via oh-my-posh's native extends feature
