@@ -120,7 +120,7 @@ in
               "_omp_config_json=${config.configFile}"
             else if isToml || isYaml then
               ''
-                _omp_config_json="$_omp_chain_dir/${baseName}.json"
+                _omp_config_json="$config_chain_dir/${baseName}.json"
                 ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg path} > "$_omp_config_json"
               ''
             else
@@ -128,7 +128,7 @@ in
           );
 
           settingsNormalizationScript = lib.optionalString (config.settings != { }) ''
-            _omp_settings_json="$_omp_chain_dir/settings.json"
+            _omp_settings_json="$config_chain_dir/settings.json"
             cp "$1" "$_omp_settings_json"
           '';
 
@@ -148,54 +148,54 @@ in
             if orderedSettings == [ ] then
               ''
                 echo '{}' > "$2"
-                rmdir "$_omp_chain_dir" 2>/dev/null || true
+                rmdir "$config_chain_dir" 2>/dev/null || true
               ''
             else
               let
                 n = builtins.length orderedSettings;
               in
               ''
-                _omp_configs=(${lib.concatStringsSep " " orderedSettings})
+                ordered_settings=(${lib.concatStringsSep " " orderedSettings})
 
                 # Scan backwards to find the rightmost config with "extends" already set.
                 # Configs before it are unreachable through our chain and can be skipped.
-                _omp_start=0
-                for (( _omp_i=${toString (n - 1)}; _omp_i>0; _omp_i-- )); do
-                  if [ "$(${jq} 'has("extends")' "''${_omp_configs[$_omp_i]}")" = "true" ]; then
-                    _omp_start=$_omp_i
+                start=0
+                for (( i=${toString (n - 1)}; i>0; i-- )); do
+                  if [ "$(${jq} 'has("extends")' "''${ordered_settings[$i]}")" = "true" ]; then
+                    start=$i
                     break
                   fi
                 done
 
-                # Build the extends chain from _omp_start to the last config
-                _omp_prev="''${_omp_configs[$_omp_start]}"
-                for (( _omp_i=_omp_start+1; _omp_i<${toString n}; _omp_i++ )); do
-                  _omp_cfg="''${_omp_configs[$_omp_i]}"
-                  if [ "$_omp_i" -eq ${toString (n - 1)} ]; then
+                # Build the extends chain from start to the last config
+                prev="''${ordered_settings[$start]}"
+                for (( i=start+1; i<${toString n}; i++ )); do
+                  curr="''${ordered_settings[$i]}"
+                  if [ "$i" -eq ${toString (n - 1)} ]; then
                     _omp_out="$2"
                   else
-                    _omp_name=$(basename "$_omp_cfg")
-                    if [[ "$_omp_name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then _omp_name="''${BASH_REMATCH[1]}"; fi
-                    _omp_out="$_omp_chain_dir/$_omp_name"
+                    cfg_name=$(basename "$curr")
+                    if [[ "$cfg_name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then cfg_name="''${BASH_REMATCH[1]}"; fi
+                    _omp_out="$config_chain_dir/$cfg_name"
                   fi
-                  _omp_tmp=$(mktemp "$_omp_chain_dir/.XXXXXXXXXX")
-                  ${jq} --arg ext "$_omp_prev" '. + {extends: $ext}' "$_omp_cfg" > "$_omp_tmp"
+                  _omp_tmp=$(mktemp "$config_chain_dir/.XXXXXXXXXX")
+                  ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$_omp_tmp"
                   mv "$_omp_tmp" "$_omp_out"
-                  _omp_prev="$_omp_out"
+                  prev="$_omp_out"
                 done
 
                 # If the loop didn't run (last config already had "extends"), copy it directly
-                if [ "$_omp_prev" != "$2" ]; then cp "$_omp_prev" "$2"; fi
+                if [ "$prev" != "$2" ]; then cp "$prev" "$2"; fi
 
                 # Remove the chain dir if nothing was written to it
-                rmdir "$_omp_chain_dir" 2>/dev/null || true
+                rmdir "$config_chain_dir" 2>/dev/null || true
               '';
         in
         # Chains all specified JSON configs via oh-my-posh's native extends feature
         ''
           mkdir -p "$(dirname "$2")"
-          _omp_chain_dir="$(dirname "$2")/config-chain"
-          mkdir -p "$_omp_chain_dir"
+          config_chain_dir="$(dirname "$2")/config-chain"
+          mkdir -p "$config_chain_dir"
           ${jsonNormalizationScript}
           ${settingsNormalizationScript}
           ${chainScript}
