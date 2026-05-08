@@ -199,12 +199,11 @@ test { wrapper = "oh-my-posh"; } {
           fileSettingsFile = "${wrapper}/config.json";
           agnosterFile = "${configChainDir}/agnoster.omp.json";
           aliensFile = "${configChainDir}/aliens.omp.json";
-          nixSettingsFile = "${configChainDir}/settings.json";
         in
         [
           (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
           (fileContains agnosterFile ''"extends": "${aliensFile}"'')
-          (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
+          (fileContains aliensFile ''"extends": "/nix/store/.*settings.json"'')
         ];
 
       "'theme > settings > file'" =
@@ -242,12 +241,11 @@ test { wrapper = "oh-my-posh"; } {
           agnosterFile = "${wrapper}/config.json";
           aliensFile = "${configChainDir}/aliens.omp.json";
           fileSettingsFile = "${configChainDir}/file-settings.json";
-          nixSettingsFile = "${configChainDir}/settings.json";
         in
         [
           (fileContains agnosterFile ''"extends": "${aliensFile}"'')
           (fileContains aliensFile ''"extends": "${fileSettingsFile}"'')
-          (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
+          (fileContains aliensFile ''"extends": "/nix/store/.*settings.json"'')
         ];
     };
 
