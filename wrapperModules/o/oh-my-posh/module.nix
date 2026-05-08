@@ -74,33 +74,33 @@ in
   };
   config = {
     package = lib.mkDefault pkgs.oh-my-posh;
-    theme = [
-      "1_shell"
-      # "agnoster"
-      "aliens"
-    ];
-    order = [ 
-      "theme"
-      "file"
-      "settings"
-    ];
-    configFile = ./foo.omp.json;
-    settings = {
-      streaming = 40;
-      # extends = "foo";
-      blocks = [
-        {
-          alignment = "left";
-          type = "prompt";
-          segments = [
-            {
-              type = "root";
-              template = "oli";
-            }
-          ];
-        }
-      ];
-    };
+    # theme = [
+    #   "1_shell"
+    #   # "agnoster"
+    #   "aliens"
+    # ];
+    # order = [
+    #   "theme"
+    #   "file"
+    #   "settings"
+    # ];
+    # configFile = ./foo.omp.json;
+    # settings = {
+    #   streaming = 40;
+    #   # extends = "foo";
+    #   blocks = [
+    #     {
+    #       alignment = "left";
+    #       type = "prompt";
+    #       segments = [
+    #         {
+    #           type = "root";
+    #           template = "oli";
+    #         }
+    #       ];
+    #     }
+    #   ];
+    # };
     constructFiles."config.json" = {
       content = builtins.toJSON config.settings;
       relPath = "config.json";

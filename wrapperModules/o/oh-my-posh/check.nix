@@ -10,6 +10,7 @@ let
   inherit (tlib)
     fileContains
     isFile
+    isDirectory
     test
     ;
   wm = self.wrappers.oh-my-posh;
@@ -39,79 +40,247 @@ test { wrapper = "oh-my-posh"; } {
       (fileContains "${wrapper}/bin/oh-my-posh" "--config.*${configFile}")
     ];
 
-  "default settings order is respected" =
-    let
-      # See here for theme values: https://github.com/JanDeDobbeleer/oh-my-posh/blob/main/themes/jandedobbeleer.omp.json
-      wrapper = wm.wrap {
-        inherit pkgs;
-        theme = "jandedobbeleer";
-        settings.console_title_template = "nix-setting";
-        configFile = writeText "config.yaml" ''
-          console_title_template: file-setting
-          final_space: false
-        '';
-      };
-      configFile = "${wrapper}/config.json";
-    in
-    [
-      (isFile configFile)
-      # Set by 'theme'
-      (fileContains configFile ''"version": 4'')
-      # Set by 'configFile'
-      (fileContains configFile ''"final_space": false'')
-      # Set by 'settings'
-      (fileContains configFile ''"console_title_template": "nix-setting"'')
-    ];
+  # "default settings order is respected" =
+  #   let
+  #     # See here for theme values: https://github.com/JanDeDobbeleer/oh-my-posh/blob/main/themes/jandedobbeleer.omp.json
+  #     wrapper = wm.wrap {
+  #       inherit pkgs;
+  #       theme = "jandedobbeleer";
+  #       settings.console_title_template = "nix-setting";
+  #       configFile = writeText "config.yaml" ''
+  #         console_title_template: file-setting
+  #         final_space: false
+  #       '';
+  #     };
+  #     configFile = "${wrapper}/config.json";
+  #   in
+  #   [
+  #     (isFile configFile)
+  #     # Set by 'theme'
+  #     (fileContains configFile ''"version": 4'')
+  #     # Set by 'configFile'
+  #     (fileContains configFile ''"final_space": false'')
+  #     # Set by 'settings'
+  #     (fileContains configFile ''"console_title_template": "nix-setting"'')
+  #   ];
+  #
+  # "custom settings order is respected" =
+  #   let
+  #     # See here for theme values: https://github.com/JanDeDobbeleer/oh-my-posh/blob/main/themes/jandedobbeleer.omp.json
+  #     wrapper = wm.wrap {
+  #       inherit pkgs;
+  #       order = [
+  #         "settings"
+  #         "file"
+  #         "theme"
+  #       ];
+  #       theme = "jandedobbeleer";
+  #       configFile = writeText "config.yaml" ''
+  #         console_title_template: will-be-overridden-by-theme
+  #         custom_config_file_setting: will-be-included
+  #       '';
+  #       settings.console_title_template = "will-be-overridden-by-theme";
+  #       settings.custom_nix_setting_1 = "will-be-overridden-by-configFile";
+  #       settings.custom_nix_setting_2 = "will-be-included";
+  #     };
+  #     configFile = "${wrapper}/config.json";
+  #   in
+  #   [
+  #     (isFile configFile)
+  #     # Set by 'theme'
+  #     (fileContains configFile ''"console_title_template": "{{ .Shell }} in {{ .Folder }}"'')
+  #     # Set by 'configFile'
+  #     (fileContains configFile ''"custom_config_file_setting": "will-be-included"'')
+  #     # Set by 'settings'
+  #     (fileContains configFile ''"custom_nix_setting_2": "will-be-included"'')
+  #   ];
+  #
+  # "theme list is merged in order" =
+  #   let
+  #     wrapper = wm.wrap {
+  #       inherit pkgs;
+  #       theme = [
+  #         "1_shell"
+  #         "jandedobbeleer"
+  #       ];
+  #     };
+  #     configFile = "${wrapper}/config.json";
+  #   in
+  #   [
+  #     (isFile configFile)
+  #     # value exclusive to 1_shell
+  #     (fileContains configFile ''"transient_prompt"'')
+  #     # 1_shell sets it to "{{ .Folder }}", jandedobbeleer overrides it to "{{ .Shell }} in {{ .Folder }}"
+  #     (fileContains configFile ''"console_title_template": "{{ .Shell }} in {{ .Folder }}"'')
+  #   ];
+  "config chains" = {
+    "'theme > file > settings (default order)'" =
+      let
+        wrapper = wm.wrap {
+          inherit pkgs;
+          theme = [
+            "aliens"
+            "agnoster"
+          ];
+          settings.foo = "foo";
+          configFile = writeText "file-settings.yaml" "bar: bar";
+        };
+        configChainDir = "${wrapper}/config-chain";
 
-  "custom settings order is respected" =
-    let
-      # See here for theme values: https://github.com/JanDeDobbeleer/oh-my-posh/blob/main/themes/jandedobbeleer.omp.json
-      wrapper = wm.wrap {
-        inherit pkgs;
-        order = [
-          "settings"
-          "file"
-          "theme"
-        ];
-        theme = "jandedobbeleer";
-        configFile = writeText "config.yaml" ''
-          console_title_template: will-be-overridden-by-theme
-          custom_config_file_setting: will-be-included
-        '';
-        settings.console_title_template = "will-be-overridden-by-theme";
-        settings.custom_nix_setting_1 = "will-be-overridden-by-configFile";
-        settings.custom_nix_setting_2 = "will-be-included";
-      };
-      configFile = "${wrapper}/config.json";
-    in
-    [
-      (isFile configFile)
-      # Set by 'theme'
-      (fileContains configFile ''"console_title_template": "{{ .Shell }} in {{ .Folder }}"'')
-      # Set by 'configFile'
-      (fileContains configFile ''"custom_config_file_setting": "will-be-included"'')
-      # Set by 'settings'
-      (fileContains configFile ''"custom_nix_setting_2": "will-be-included"'')
-    ];
+        nixSettingsFile = "${wrapper}/config.json";
+        fileSettingsFile = "${configChainDir}/file-settings.json";
+        agnosterFile = "${configChainDir}/agnoster.omp.json";
+      in
+      [
+        (fileContains nixSettingsFile ''"extends": "${fileSettingsFile}"'')
+        (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
+        (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
+      ];
 
-  "theme list is merged in order" =
-    let
-      wrapper = wm.wrap {
-        inherit pkgs;
-        theme = [
-          "1_shell"
-          "jandedobbeleer"
-        ];
-      };
-      configFile = "${wrapper}/config.json";
-    in
-    [
-      (isFile configFile)
-      # value exclusive to 1_shell
-      (fileContains configFile ''"transient_prompt"'')
-      # 1_shell sets it to "{{ .Folder }}", jandedobbeleer overrides it to "{{ .Shell }} in {{ .Folder }}"
-      (fileContains configFile ''"console_title_template": "{{ .Shell }} in {{ .Folder }}"'')
-    ];
+    "'file > theme > settings'" =
+      let
+        wrapper = wm.wrap {
+          inherit pkgs;
+          order = [
+            "file"
+            "theme"
+            "settings"
+          ];
+          theme = [
+            "aliens"
+            "agnoster"
+          ];
+          settings.foo = "foo";
+          configFile = writeText "file-settings.yaml" "bar: bar";
+        };
+        configChainDir = "${wrapper}/config-chain";
+
+        nixSettingsFile = "${wrapper}/config.json";
+        fileSettingsFile = "${configChainDir}/file-settings.json";
+        agnosterFile = "${configChainDir}/agnoster.omp.json";
+        aliensFile = "${configChainDir}/aliens.omp.json";
+      in
+      [
+        (fileContains nixSettingsFile ''"extends": "${agnosterFile}"'')
+        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+        (fileContains aliensFile ''"extends": "/nix/store/.*file-settings.json"'')
+      ];
+
+    "'file > settings > theme'" =
+      let
+        wrapper = wm.wrap {
+          inherit pkgs;
+          order = [
+            "file"
+            "settings"
+            "theme"
+          ];
+          theme = [
+            "aliens"
+            "agnoster"
+          ];
+          settings.foo = "foo";
+          configFile = writeText "file-settings.yaml" "bar: bar";
+        };
+        configChainDir = "${wrapper}/config-chain";
+
+        agnosterFile = "${wrapper}/config.json";
+        aliensFile = "${configChainDir}/aliens.omp.json";
+        nixSettingsFile = "${configChainDir}/settings.json";
+        fileSettingsFile = "${configChainDir}/file-settings.json";
+      in
+      [
+        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+        (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
+        (fileContains nixSettingsFile ''"extends": "/nix/store/.*file-settings.json"'')
+      ];
+
+    "'settings > theme > file'" =
+      let
+        wrapper = wm.wrap {
+          inherit pkgs;
+          order = [
+            "settings"
+            "theme"
+            "file"
+          ];
+          theme = [
+            "aliens"
+            "agnoster"
+          ];
+          settings.foo = "foo";
+          configFile = writeText "file-settings.yaml" "bar: bar";
+        };
+        configChainDir = "${wrapper}/config-chain";
+
+        fileSettingsFile = "${wrapper}/config.json";
+        agnosterFile = "${configChainDir}/agnoster.omp.json";
+        aliensFile = "${configChainDir}/aliens.omp.json";
+        nixSettingsFile = "${configChainDir}/settings.json";
+      in
+      [
+        (fileContains fileSettingsFile ''"extends": "${agnosterFile}"'')
+        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+        (fileContains aliensFile ''"extends": "${nixSettingsFile}"'')
+      ];
+
+    "'theme > settings > file'" =
+      let
+        wrapper = wm.wrap {
+          inherit pkgs;
+          order = [
+            "theme"
+            "settings"
+            "file"
+          ];
+          theme = [
+            "aliens"
+            "agnoster"
+          ];
+          settings.foo = "foo";
+          configFile = writeText "file-settings.yaml" "bar: bar";
+        };
+        configChainDir = "${wrapper}/config-chain";
+
+        fileSettingsFile = "${wrapper}/config.json";
+        nixSettingsFile = "${configChainDir}/settings.json";
+        agnosterFile = "${configChainDir}/agnoster.omp.json";
+      in
+      [
+        (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
+        (fileContains nixSettingsFile ''"extends": "${agnosterFile}"'')
+        (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
+      ];
+
+    "'settings > file > theme'" =
+      let
+        wrapper = wm.wrap {
+          inherit pkgs;
+          order = [
+            "settings"
+            "file"
+            "theme"
+          ];
+          theme = [
+            "aliens"
+            "agnoster"
+          ];
+          settings.foo = "foo";
+          configFile = writeText "file-settings.yaml" "bar: bar";
+        };
+        configChainDir = "${wrapper}/config-chain";
+
+        agnosterFile = "${wrapper}/config.json";
+        aliensFile = "${configChainDir}/aliens.omp.json";
+        fileSettingsFile = "${configChainDir}/file-settings.json";
+        nixSettingsFile = "${configChainDir}/settings.json";
+      in
+      [
+        (fileContains agnosterFile ''"extends": "${aliensFile}"'')
+        (fileContains aliensFile ''"extends": "${fileSettingsFile}"'')
+        (fileContains fileSettingsFile ''"extends": "${nixSettingsFile}"'')
+      ];
+  };
 
   "config file formats" =
     let
