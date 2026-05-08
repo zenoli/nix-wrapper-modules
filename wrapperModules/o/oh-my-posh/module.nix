@@ -77,9 +77,12 @@ in
     theme = [
       "1_shell"
       "agnoster"
+      "aliens"
     ];
+    configFile = ./foo.omp.json;
     settings = {
       streaming = 40;
+      extends = "foo";
       blocks = [
         {
           alignment = "left";
