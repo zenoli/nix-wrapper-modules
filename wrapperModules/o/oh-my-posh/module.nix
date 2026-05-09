@@ -169,37 +169,26 @@ in
           }
           // extend prev (builtins.tail configs);
 
-      lastConfig = lib.last orderedConfigs;
-
       chainFiles =
         if n == 0 then
-          {
+          { }
+        else if n == 1 then
+          let cfg = builtins.head orderedConfigs;
+          in {
             "config.json" = {
               relPath = "config.json";
-              content = "{}";
+              builder = ''
+                mkdir -p "$(dirname "$2")"
+                cp ${lib.escapeShellArg cfg.srcPath} "$2"
+              '';
             };
           }
         else
-          (
-            if n == 1 then
-              let
-                cfg = builtins.head orderedConfigs;
-              in
-              {
-                "config-chain/${cfg.name}" = {
-                  relPath = "config-chain/${cfg.name}";
-                  builder = ''
-                    mkdir -p "$(dirname "$2")"
-                    cp ${lib.escapeShellArg cfg.srcPath} "$2"
-                  '';
-                };
-              }
-            else
-              let
-                reversed = lib.reverseList orderedConfigs;
-              in
-              extend (builtins.head reversed) (builtins.tail reversed)
-          )
+          let
+            reversed = lib.reverseList orderedConfigs;
+            lastConfig = lib.last orderedConfigs;
+          in
+          extend (builtins.head reversed) (builtins.tail reversed)
           // {
             "config.json" = {
               relPath = "config.json";
@@ -213,7 +202,7 @@ in
     {
       package = lib.mkDefault pkgs.oh-my-posh;
       constructFiles = chainFiles;
-      flags."--config" = config.constructFiles."config.json".path;
+      flags."--config" = lib.mkIf (n > 0) config.constructFiles."config.json".path;
       meta = {
         maintainers = with wlib.maintainers; [
           zenoli

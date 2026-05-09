@@ -32,6 +32,7 @@ test { wrapper = "oh-my-posh"; } {
     let
       wrapper = wm.wrap {
         inherit pkgs;
+        theme = "jandedobbeleer";
       };
       configFile = "${wrapper}/config.json";
     in
