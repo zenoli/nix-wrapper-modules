@@ -242,6 +242,43 @@ in
 
           These options are not mutually exclusive. If multiple are defined,
           they will be merged according to the order specified in `config.order`.
+
+          Merging is done using Oh-My-Posh's native
+          [extends](https://ohmyposh.dev/docs/configuration/general#extends) mechanic,
+          which allows a configuration file to inherit from another and override individual values.
+
+          Configs with higher precedence will be modified during build-time to add an `.extends` key
+          pointing to the next config in the list. If a config already has an `.extends` key present,
+          it is used as-is and the remaining lower-precedence configs are ignored.
+
+          **Example**
+
+          ```nix
+          theme = "jandedobbeleer";
+          configFile = ./my-config.yaml;
+          settings.console_title_template = "{{ .Folder }}";
+          ```
+
+          With the default order (`theme < file < settings`), this produces the chain:
+
+          ```
+          settings.json  →  my-config.json  →  jandedobbeleer.omp.json
+          (highest precedence)                  (lowest precedence)
+          ```
+
+          `settings.json` has an `extends` key pointing to `my-config.json`,
+          which in turn extends `jandedobbeleer.omp.json`.
+
+          If `my-config.yaml` already contains an `extends` key (e.g. pointing to another theme),
+          it is left unchanged and the chain stops there:
+
+          ```
+          settings.json  →  my-config.json  -x-  jandedobbeleer.omp.json
+          (highest precedence)    ↓
+                           (its own extends)
+          ```
+
+          `jandedobbeleer.omp.json` is dropped entirely — `my-config.yaml`'s own `extends` takes over as the base.
         '';
       };
     };
