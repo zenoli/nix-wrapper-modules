@@ -72,164 +72,124 @@ in
       '';
     };
   };
-  config = {
-    package = lib.mkDefault pkgs.oh-my-posh;
-    # theme = [
-    #   "1_shell"
-    #   # "agnoster"
-    #   "aliens"
-    # ];
-    # order = [
-    #   "theme"
-    #   "settings"
-    #   "file"
-    # ];
-    # configFile = ./file-settings.json;
-    # settings = {
-    #   streaming = 40;
-    #   # extends = "foo";
-    #   blocks = [
-    #     {
-    #       alignment = "left";
-    #       type = "prompt";
-    #       segments = [
-    #         {
-    #           type = "root";
-    #           template = "oli";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    # };
-    constructFiles."config.json" = {
-      relPath = "config.json";
-      builder =
+
+  config =
+    let
+      nixSettingsFile = pkgs.writeText "settings.json" (builtins.toJSON config.settings);
+
+      stripStoreHash =
+        name:
         let
-          nixSettingsFile = pkgs.writeText "settings.json" (builtins.toJSON config.settings);
-
-          stripStoreHash =
-            name:
-            let
-              m = builtins.match "[a-z0-9]{32}-(.*)" name;
-            in
-            if m != null then builtins.head m else name;
-
-          normalizedConfigFile =
-            if config.configFile == null then
-              null
-            else
-              let
-                path = toString config.configFile;
-                baseName = stripStoreHash (builtins.baseNameOf path);
-                isJson = lib.hasSuffix ".json" baseName;
-                isToml = lib.hasSuffix ".toml" baseName;
-                isYaml = lib.hasSuffix ".yaml" baseName || lib.hasSuffix ".yml" baseName;
-              in
-              if isJson then
-                config.configFile
-              else if isToml || isYaml then
-                let
-                  configFileName = lib.pipe baseName [
-                    (lib.removeSuffix ".toml")
-                    (lib.removeSuffix ".yaml")
-                    (lib.removeSuffix ".yml")
-                  ];
-                in
-                pkgs.runCommand "${configFileName}.json" { } ''
-                  ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg "${config.configFile}"} > $out
-                ''
-              else
-                throw "oh-my-posh: configFile must have a .json, .toml, .yaml, or .yml extension, got: ${path}";
-
-          orderedSettings =
-            let
-              jsonSettingsMap = {
-                ${themeKey} = map (
-                  p: lib.escapeShellArg "${config.package}/share/oh-my-posh/themes/${p}.omp.json"
-                ) config.theme;
-                ${fileKey} = lib.optional (config.configFile != null) "${normalizedConfigFile}";
-                ${settingsKey} = lib.optional (config.settings != { }) "${nixSettingsFile}";
-              };
-            in
-            lib.concatMap (key: jsonSettingsMap.${key}) config.order;
-
-          jq = "${pkgs.jq}/bin/jq";
-          chainScript =
-            if orderedSettings == [ ] then
-              ''
-                echo '{}' > "$2"
-                rmdir "$config_chain_dir" 2>/dev/null || true
-              ''
-            else
-              let
-                n = builtins.trace (lib.concatStringsSep "\n" orderedSettings) (builtins.length orderedSettings);
-              in
-              ''
-                ordered_settings=(${lib.concatStringsSep " " orderedSettings})
-
-                # Scan backwards to find the rightmost config with "extends" already set.
-                # Configs before it are unreachable through our chain and can be skipped.
-                start=0
-                for (( i=${toString (n - 1)}; i>0; i-- )); do
-                  if [ "$(${jq} 'has("extends")' "''${ordered_settings[$i]}")" = "true" ]; then
-                    start=$i
-                    break
-                  fi
-                done
-
-                get_name() {
-                  name=$(basename "$1")
-                  if [[ "$name" =~ ^[a-z0-9]{32}-(.+)$ ]]; then name="''${BASH_REMATCH[1]}"; fi
-                  echo $name
-                }
-
-                # Build the extends chain from start to the last config
-                prev="''${ordered_settings[$start]}"
-                for (( i=start+1; i<${toString n}; i++ )); do
-                  curr="''${ordered_settings[$i]}"
-                  if [ "$i" -eq ${toString (n - 1)} ]; then
-                    dst="$2"
-                  else
-                    dst="$config_chain_dir/$(get_name $curr)"
-                  fi
-                  tmp=$(mktemp)
-                  ${jq} --arg ext "$prev" '. + {extends: $ext}' "$curr" > "$tmp" && mv $tmp $dst
-                  prev="$dst"
-                done
-
-                # If the loop didn't run (last config already had "extends"), copy it directly
-                if [ "$start" -eq ${toString (n - 1)} ]; then cp "$prev" "$2"; fi
-
-                # Remove the chain dir if nothing was written to it
-                rmdir "$config_chain_dir" 2>/dev/null || true
-              '';
+          m = builtins.match "[a-z0-9]{32}-(.*)" name;
         in
-        # Chains all specified JSON configs via oh-my-posh's native extends feature
-        ''
-          mkdir -p "$(dirname "$2")"
-          config_chain_dir="$(dirname "$2")/config-chain"
-          mkdir -p "$config_chain_dir"
-          ${chainScript}
+        if m != null then builtins.head m else name;
+
+      normalizedConfigFile =
+        if config.configFile == null then
+          null
+        else
+          let
+            path = toString config.configFile;
+            baseName = stripStoreHash (builtins.baseNameOf path);
+            isJson = lib.hasSuffix ".json" baseName;
+            isToml = lib.hasSuffix ".toml" baseName;
+            isYaml = lib.hasSuffix ".yaml" baseName || lib.hasSuffix ".yml" baseName;
+            configFileName =
+              lib.pipe baseName [
+                (lib.removeSuffix ".toml")
+                (lib.removeSuffix ".yaml")
+                (lib.removeSuffix ".yml")
+              ] + ".json";
+          in
+          if isJson then
+            config.configFile
+          else if isToml || isYaml then
+            pkgs.runCommand configFileName { } ''
+              ${pkgs.yq-go}/bin/yq -o=json '.' ${lib.escapeShellArg "${config.configFile}"} > $out
+            ''
+          else
+            throw "oh-my-posh: configFile must have a .json, .toml, .yaml, or .yml extension, got: ${path}";
+
+      # List of { srcPath, name } in precedence order (lowest to highest)
+      orderedConfigs = lib.concatMap (key: {
+        ${themeKey} = map (p: {
+          srcPath = "${config.package}/share/oh-my-posh/themes/${p}.omp.json";
+          name = "${p}.omp.json";
+        }) config.theme;
+        ${fileKey} = lib.optional (config.configFile != null) {
+          srcPath = "${normalizedConfigFile}";
+          name = stripStoreHash (builtins.baseNameOf (toString normalizedConfigFile));
+        };
+        ${settingsKey} = lib.optional (config.settings != { }) {
+          srcPath = "${nixSettingsFile}";
+          name = "settings.json";
+        };
+      }.${key}) config.order;
+
+      n = builtins.length orderedConfigs;
+      jq = "${pkgs.jq}/bin/jq";
+
+      # Build a constructFile entry for index i, extending prevPath
+      mkEntry = i: prevPath:
+        let
+          cfg = builtins.elemAt orderedConfigs i;
+          relPath = if i == n - 1 then "config.json" else "config-chain/${cfg.name}";
+        in
+        {
+          inherit relPath;
+          builder = ''
+            mkdir -p "$(dirname "$2")"
+            ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg cfg.srcPath} > "$2"
+          '';
+        };
+
+      # Recursively build constructFile entries for indices i..n-1
+      buildChain = i: prevPath:
+        let
+          entry = mkEntry i prevPath;
+          thisPath = "${builtins.placeholder "out"}/${entry.relPath}";
+        in
+        { ${entry.relPath} = entry; }
+        // (if i < n - 1 then buildChain (i + 1) thisPath else { });
+
+      chainFiles =
+        if n == 0 then
+          { "config.json" = { relPath = "config.json"; content = "{}"; }; }
+        else if n == 1 then
+          let cfg = builtins.head orderedConfigs;
+          in {
+            "config.json" = {
+              relPath = "config.json";
+              builder = ''
+                mkdir -p "$(dirname "$2")"
+                cp ${lib.escapeShellArg cfg.srcPath} "$2"
+              '';
+            };
+          }
+        else
+          buildChain 1 (builtins.head orderedConfigs).srcPath;
+    in
+    {
+      package = lib.mkDefault pkgs.oh-my-posh;
+      constructFiles = chainFiles;
+      flags."--config" = config.constructFiles."config.json".path;
+      meta = {
+        maintainers = with wlib.maintainers; [
+          zenoli
+        ];
+        description = ''
+          Wrapper Module for the [Oh-My-Posh Prompt](https://ohmyposh.dev/).
+
+          Oh-My-Posh is configured via a [JSON/YAML/TOML file](https://ohmyposh.dev/docs/configuration/general).
+          This module provides three ways to do this:
+
+          - By specifying one (or many) of the built-in preset configurations.
+          - By pointing to a JSON, TOML, or YAML configuration file.
+          - By using pure Nix to write an attribute set that gets converted to JSON.
+
+          These options are not mutually exclusive. If multiple are defined,
+          they will be merged according to the order specified in `config.order`.
         '';
+      };
     };
-    flags."--config" = config.constructFiles."config.json".path;
-    meta = {
-      maintainers = with wlib.maintainers; [
-        zenoli
-      ];
-      description = ''
-        Wrapper Module for the [Oh-My-Posh Prompt](https://ohmyposh.dev/).
-
-        Oh-My-Posh is configured via a [JSON/YAML/TOML file](https://ohmyposh.dev/docs/configuration/general).
-        This module provides three ways to do this:
-
-        - By specifying one (or many) of the built-in preset configurations.
-        - By pointing to a JSON, TOML, or YAML configuration file.
-        - By using pure Nix to write an attribute set that gets converted to JSON.
-
-        These options are not mutually exclusive. If multiple are defined,
-        they will be merged according to the order specified in `config.order`.
-      '';
-    };
-  };
 }
