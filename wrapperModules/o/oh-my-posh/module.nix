@@ -232,12 +232,6 @@ in
     {
       inherit constructFiles;
       package = lib.mkDefault pkgs.oh-my-posh;
-      # theme = lib.mkDefault [
-      #   "agnoster"
-      #   "aliens"
-      # ];
-      # configFile = lib.mkDefault ./foo.omp.yaml;
-      # settings = lib.mkDefault { foo = "foo"; };
       flags."--config" = lib.mkIf (n > 0) config.constructFiles."config.json".path;
       meta = {
         maintainers = with wlib.maintainers; [
