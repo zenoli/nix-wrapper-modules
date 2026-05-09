@@ -192,16 +192,39 @@ in
           // {
             "config.json" = {
               relPath = "config.json";
-              builder = ''
-                mkdir -p "$(dirname "$2")"
-                ln -s ${lib.escapeShellArg "${builtins.placeholder "out"}/config-chain/${lastConfig.name}"} "$2"
-              '';
+              builder =
+                let
+                  chainDir = "${builtins.placeholder "out"}/config-chain";
+                  lastConfigPath = "${chainDir}/${lastConfig.name}";
+                in
+                ''
+                  # Follow the extends chain and remove files in config-chain that are
+                  # no longer reachable (cut off by a config that already had "extends")
+                  declare -A reachable
+                  current=${lib.escapeShellArg lastConfigPath}
+                  while [ -f "$current" ]; do
+                    reachable["$current"]=1
+                    ext=$(${jq} -r '.extends // empty' "$current")
+                    [[ "$ext" == ${lib.escapeShellArg chainDir}/* ]] || break
+                    current="$ext"
+                  done
+                  for f in ${lib.escapeShellArg chainDir}/*; do
+                    [ -v 'reachable[$f]' ] || rm "$f"
+                  done
+                  rmdir ${lib.escapeShellArg chainDir} 2>/dev/null || true
+
+                  mkdir -p "$(dirname "$2")"
+                  ln -s ${lib.escapeShellArg lastConfigPath} "$2"
+                '';
             };
           };
     in
     {
       package = lib.mkDefault pkgs.oh-my-posh;
       constructFiles = chainFiles;
+      theme = lib.mkDefault [ "agnoster" "aliens" ];
+      configFile = lib.mkDefault ./foo.omp.yaml;
+      settings = lib.mkDefault { foo = "foo"; };
       flags."--config" = lib.mkIf (n > 0) config.constructFiles."config.json".path;
       meta = {
         maintainers = with wlib.maintainers; [
