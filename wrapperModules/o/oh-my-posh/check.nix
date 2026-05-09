@@ -235,4 +235,22 @@ test { wrapper = "oh-my-posh"; } {
           (fileContains generatedConfig value)
         ];
     };
+
+  "explicit extends in settings breaks the config chain" =
+    let
+      wrapper = wm.wrap {
+        inherit pkgs;
+        theme = [
+          "aliens"
+          "agnoster"
+        ];
+        settings.extends = "foo";
+      };
+      configChainDir = "${wrapper}/config-chain";
+    in
+    [
+      (isFile "${configChainDir}/settings.json")
+      (notIsFile "${configChainDir}/agnoster.omp.json")
+      (notIsFile "${configChainDir}/aliens.omp.json")
+    ];
 }
