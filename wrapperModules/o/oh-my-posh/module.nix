@@ -129,45 +129,86 @@ in
       n = builtins.length orderedConfigs;
       jq = "${pkgs.jq}/bin/jq";
 
-      # Build a constructFile entry for index i, extending prevPath
-      mkEntry = i: prevPath:
-        let
-          cfg = builtins.elemAt orderedConfigs i;
-          relPath = if i == n - 1 then "config.json" else "config-chain/${cfg.name}";
-        in
-        {
-          inherit relPath;
-          builder = ''
-            mkdir -p "$(dirname "$2")"
-            ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg cfg.srcPath} > "$2"
-          '';
-        };
+      # If currPath already has an "extends" key, copy it as-is.
+      # Otherwise, add prevPath as the "extends" value.
+      generateBuilderScript =
+        currPath: prevPath:
+        ''
+          mkdir -p "$(dirname "$2")"
+          if [ "$(${jq} 'has("extends")' ${lib.escapeShellArg currPath})" = "true" ]; then
+            cp ${lib.escapeShellArg currPath} "$2"
+          else
+            ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg currPath} > "$2"
+          fi
+        '';
 
-      # Recursively build constructFile entries for indices i..n-1
-      buildChain = i: prevPath:
+      # Build constructFile entries for the extends chain.
+      # curr: the current (higher-precedence) config being processed.
+      # configs: remaining configs in descending precedence order.
+      extend =
+        curr: configs:
         let
-          entry = mkEntry i prevPath;
-          thisPath = "${builtins.placeholder "out"}/${entry.relPath}";
+          relPath = "config-chain/${curr.name}";
+          prev = builtins.head configs;
         in
-        { ${entry.relPath} = entry; }
-        // (if i < n - 1 then buildChain (i + 1) thisPath else { });
+        if builtins.length configs == 1 then
+          # Base: prev is the lowest-precedence config — point directly to its source
+          {
+            ${relPath} = {
+              inherit relPath;
+              builder = generateBuilderScript curr.srcPath prev.srcPath;
+            };
+          }
+        else
+          # Recursive: prev will itself be a generated file in config-chain
+          {
+            ${relPath} = {
+              inherit relPath;
+              builder = generateBuilderScript curr.srcPath "${builtins.placeholder "out"}/config-chain/${prev.name}";
+            };
+          }
+          // extend prev (builtins.tail configs);
+
+      lastConfig = lib.last orderedConfigs;
 
       chainFiles =
         if n == 0 then
-          { "config.json" = { relPath = "config.json"; content = "{}"; }; }
-        else if n == 1 then
-          let cfg = builtins.head orderedConfigs;
-          in {
+          {
+            "config.json" = {
+              relPath = "config.json";
+              content = "{}";
+            };
+          }
+        else
+          (
+            if n == 1 then
+              let
+                cfg = builtins.head orderedConfigs;
+              in
+              {
+                "config-chain/${cfg.name}" = {
+                  relPath = "config-chain/${cfg.name}";
+                  builder = ''
+                    mkdir -p "$(dirname "$2")"
+                    cp ${lib.escapeShellArg cfg.srcPath} "$2"
+                  '';
+                };
+              }
+            else
+              let
+                reversed = lib.reverseList orderedConfigs;
+              in
+              extend (builtins.head reversed) (builtins.tail reversed)
+          )
+          // {
             "config.json" = {
               relPath = "config.json";
               builder = ''
                 mkdir -p "$(dirname "$2")"
-                cp ${lib.escapeShellArg cfg.srcPath} "$2"
+                ln -s ${lib.escapeShellArg "${builtins.placeholder "out"}/config-chain/${lastConfig.name}"} "$2"
               '';
             };
-          }
-        else
-          buildChain 1 (builtins.head orderedConfigs).srcPath;
+          };
     in
     {
       package = lib.mkDefault pkgs.oh-my-posh;
