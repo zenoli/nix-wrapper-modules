@@ -11,6 +11,7 @@ let
     fileContains
     isFile
     isDirectory
+    notIsFile
     test
     ;
   wm = self.wrappers.oh-my-posh;
@@ -28,7 +29,7 @@ test { wrapper = "oh-my-posh"; } {
       grep -q "${wrapper.version}"
     '';
 
-  "config.json is properly configured" =
+  "If config is provided then config.json is properly set up" =
     let
       wrapper = wm.wrap {
         inherit pkgs;
@@ -40,6 +41,15 @@ test { wrapper = "oh-my-posh"; } {
       (isFile configFile)
       (fileContains "${wrapper}/bin/oh-my-posh" "--config.*${configFile}")
     ];
+
+  "If no config is provided then no config.json is set up" =
+    let
+      wrapper = wm.wrap {
+        inherit pkgs;
+      };
+      configFile = "${wrapper}/config.json";
+    in
+      notIsFile configFile;
 
   "config chains" =
     let
