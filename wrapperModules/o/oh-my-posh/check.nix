@@ -54,7 +54,7 @@ test { wrapper = "oh-my-posh"; } {
       };
     in
     {
-      "'theme > file > settings (default order)'" =
+      "theme > file > settings (default order)" =
         let
           wrapper = baseWrapper;
           configChainDir = "${wrapper}/config-chain";
@@ -69,7 +69,7 @@ test { wrapper = "oh-my-posh"; } {
           (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
         ];
 
-      "'file > theme > settings'" =
+      "file > theme > settings" =
         let
           wrapper = baseWrapper.wrap {
             order = [
@@ -91,7 +91,7 @@ test { wrapper = "oh-my-posh"; } {
           (fileContains aliensFile ''"extends": "/nix/store/.*file-settings.json"'')
         ];
 
-      "'file > settings > theme'" =
+      "file > settings > theme" =
         let
           wrapper = baseWrapper.wrap {
             order = [
@@ -113,7 +113,7 @@ test { wrapper = "oh-my-posh"; } {
           (fileContains nixSettingsFile ''"extends": "/nix/store/.*file-settings.json"'')
         ];
 
-      "'settings > theme > file'" =
+      "settings > theme > file" =
         let
           wrapper = baseWrapper.wrap {
             order = [
@@ -134,7 +134,7 @@ test { wrapper = "oh-my-posh"; } {
           (fileContains aliensFile ''"extends": "/nix/store/.*settings.json"'')
         ];
 
-      "'theme > settings > file'" =
+      "theme > settings > file" =
         let
           wrapper = baseWrapper.wrap {
             order = [
@@ -155,7 +155,7 @@ test { wrapper = "oh-my-posh"; } {
           (fileContains agnosterFile ''"extends": "/nix/store/.*aliens.omp.json"'')
         ];
 
-      "'settings > file > theme'" =
+      "settings > file > theme" =
         let
           wrapper = baseWrapper.wrap {
             order = [

@@ -10,7 +10,7 @@
 let
   wlib = self.lib;
 
-  errMsg = msg: "(echo ${renderMsg msg} >&2 && return 1)";
+  errMsg = msg: "(echo \"${renderMsg msg}\" >&2 && return 1)";
 
   indentBlock =
     str: num:
