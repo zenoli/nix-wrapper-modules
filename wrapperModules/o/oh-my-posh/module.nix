@@ -49,7 +49,10 @@ in
       apply = lib.toList;
       description = ''
         One or more built-in oh-my-posh themes to use as configuration.
-        When a list is provided, themes later in the list take precedence.
+        When a list is provided, they will be merged by chaining them with 
+        [`.extends`](https://ohmyposh.dev/docs/configuration/general#extends).
+        Themes later in the list take precedence.
+
         See <https://ohmyposh.dev/docs/themes/>.
       '';
       example = [
@@ -131,21 +134,9 @@ in
         .${key}
       ) config.order;
 
-      n = builtins.length orderedConfigs;
       jq = "${pkgs.jq}/bin/jq";
 
-      # If currPath already has an "extends" key, copy it as-is.
-      # Otherwise, add prevPath as the "extends" value.
-      generateBuilderScript = currPath: prevPath: ''
-        mkdir -p "$(dirname "$2")"
-        if [ "$(${jq} 'has("extends")' ${lib.escapeShellArg currPath})" = "true" ]; then
-          cp ${lib.escapeShellArg currPath} "$2"
-        else
-          ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg currPath} > "$2"
-        fi
-      '';
-
-      # Build constructFile entries for the extends chain.
+      # Build constructFile entries for the config chain.
       # curr: the current (higher-precedence) config being processed.
       # configs: remaining configs in descending precedence order.
       extend =
@@ -153,6 +144,18 @@ in
         let
           relPath = "config-chain/${curr.name}";
           prev = builtins.head configs;
+
+          #
+          # If currPath already has an "extends" key, copy it as-is.
+          # Otherwise, add prevPath as the "extends" value.
+          generateBuilderScript = currPath: prevPath: ''
+            mkdir -p "$(dirname "$2")"
+            if [ "$(${jq} 'has("extends")' ${lib.escapeShellArg currPath})" = "true" ]; then
+              cp ${lib.escapeShellArg currPath} "$2"
+            else
+              ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg currPath} > "$2"
+            fi
+          '';
         in
         if builtins.length configs == 1 then
           # Base: prev is the lowest-precedence config — point directly to its source
@@ -172,7 +175,9 @@ in
           }
           // extend prev (builtins.tail configs);
 
-      chainFiles =
+      n = builtins.length orderedConfigs;
+
+      constructFiles =
         if n == 0 then
           { }
         else if n == 1 then
@@ -225,14 +230,14 @@ in
           };
     in
     {
+      inherit constructFiles;
       package = lib.mkDefault pkgs.oh-my-posh;
-      constructFiles = chainFiles;
-      theme = lib.mkDefault [
-        "agnoster"
-        "aliens"
-      ];
-      configFile = lib.mkDefault ./foo.omp.yaml;
-      settings = lib.mkDefault { foo = "foo"; };
+      # theme = lib.mkDefault [
+      #   "agnoster"
+      #   "aliens"
+      # ];
+      # configFile = lib.mkDefault ./foo.omp.yaml;
+      # settings = lib.mkDefault { foo = "foo"; };
       flags."--config" = lib.mkIf (n > 0) config.constructFiles."config.json".path;
       meta = {
         maintainers = with wlib.maintainers; [
@@ -244,7 +249,7 @@ in
           Oh-My-Posh is configured via a [JSON/YAML/TOML file](https://ohmyposh.dev/docs/configuration/general).
           This module provides three ways to do this:
 
-          - By specifying one (or many) of the built-in preset configurations.
+          - By specifying one (or many) of the [built-in themes](https://ohmyposh.dev/docs/themes/).
           - By pointing to a JSON, TOML, or YAML configuration file.
           - By using pure Nix to write an attribute set that gets converted to JSON.
 
