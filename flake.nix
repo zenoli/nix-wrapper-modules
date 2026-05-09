@@ -34,17 +34,27 @@
       homeModules = self.nixosModules;
       hjemModules = self.nixosModules;
       packages = forAllSystems (
-        system: let
+        system:
+        let
           pkgs = getPkgs system;
-          foo = pkgs.writeTextFile { name = "bar"; text = "foo"; destination = "/shared"; };
+          foo = pkgs.writeTextFile {
+            name = "bar";
+            text = "foo";
+            destination = "/shared";
+          };
           files = pkgs.symlinkJoin {
             name = "tmp-settings";
             paths = [ foo ];
           };
-          
-        in 
-        (lib.mapAttrs (_: cfg: cfg.wrap { inherit pkgs; }) self.wrappers) 
-        // { foo = files; } // { bar = foo; }
+
+        in
+        (lib.mapAttrs (_: cfg: cfg.wrap { inherit pkgs; }) self.wrappers)
+        // {
+          foo = files;
+        }
+        // {
+          bar = foo;
+        }
       );
       devShells = forAllSystems (system: {
         default = import ./shell.nix { pkgs = getPkgs system; };

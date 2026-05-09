@@ -99,7 +99,8 @@ in
                 (lib.removeSuffix ".toml")
                 (lib.removeSuffix ".yaml")
                 (lib.removeSuffix ".yml")
-              ] + ".json";
+              ]
+              + ".json";
           in
           if isJson then
             config.configFile
@@ -111,36 +112,38 @@ in
             throw "oh-my-posh: configFile must have a .json, .toml, .yaml, or .yml extension, got: ${path}";
 
       # List of { srcPath, name } in precedence order (lowest to highest)
-      orderedConfigs = lib.concatMap (key: {
-        ${themeKey} = map (p: {
-          srcPath = "${config.package}/share/oh-my-posh/themes/${p}.omp.json";
-          name = "${p}.omp.json";
-        }) config.theme;
-        ${fileKey} = lib.optional (config.configFile != null) {
-          srcPath = "${normalizedConfigFile}";
-          name = stripStoreHash (builtins.baseNameOf (toString normalizedConfigFile));
-        };
-        ${settingsKey} = lib.optional (config.settings != { }) {
-          srcPath = "${nixSettingsFile}";
-          name = "settings.json";
-        };
-      }.${key}) config.order;
+      orderedConfigs = lib.concatMap (
+        key:
+        {
+          ${themeKey} = map (p: {
+            srcPath = "${config.package}/share/oh-my-posh/themes/${p}.omp.json";
+            name = "${p}.omp.json";
+          }) config.theme;
+          ${fileKey} = lib.optional (config.configFile != null) {
+            srcPath = "${normalizedConfigFile}";
+            name = stripStoreHash (builtins.baseNameOf (toString normalizedConfigFile));
+          };
+          ${settingsKey} = lib.optional (config.settings != { }) {
+            srcPath = "${nixSettingsFile}";
+            name = "settings.json";
+          };
+        }
+        .${key}
+      ) config.order;
 
       n = builtins.length orderedConfigs;
       jq = "${pkgs.jq}/bin/jq";
 
       # If currPath already has an "extends" key, copy it as-is.
       # Otherwise, add prevPath as the "extends" value.
-      generateBuilderScript =
-        currPath: prevPath:
-        ''
-          mkdir -p "$(dirname "$2")"
-          if [ "$(${jq} 'has("extends")' ${lib.escapeShellArg currPath})" = "true" ]; then
-            cp ${lib.escapeShellArg currPath} "$2"
-          else
-            ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg currPath} > "$2"
-          fi
-        '';
+      generateBuilderScript = currPath: prevPath: ''
+        mkdir -p "$(dirname "$2")"
+        if [ "$(${jq} 'has("extends")' ${lib.escapeShellArg currPath})" = "true" ]; then
+          cp ${lib.escapeShellArg currPath} "$2"
+        else
+          ${jq} --arg ext ${lib.escapeShellArg prevPath} '. + {extends: $ext}' ${lib.escapeShellArg currPath} > "$2"
+        fi
+      '';
 
       # Build constructFile entries for the extends chain.
       # curr: the current (higher-precedence) config being processed.
@@ -173,8 +176,10 @@ in
         if n == 0 then
           { }
         else if n == 1 then
-          let cfg = builtins.head orderedConfigs;
-          in {
+          let
+            cfg = builtins.head orderedConfigs;
+          in
+          {
             "config.json" = {
               relPath = "config.json";
               builder = ''
@@ -222,7 +227,10 @@ in
     {
       package = lib.mkDefault pkgs.oh-my-posh;
       constructFiles = chainFiles;
-      theme = lib.mkDefault [ "agnoster" "aliens" ];
+      theme = lib.mkDefault [
+        "agnoster"
+        "aliens"
+      ];
       configFile = lib.mkDefault ./foo.omp.yaml;
       settings = lib.mkDefault { foo = "foo"; };
       flags."--config" = lib.mkIf (n > 0) config.constructFiles."config.json".path;
