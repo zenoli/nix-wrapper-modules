@@ -49,7 +49,7 @@ test { wrapper = "oh-my-posh"; } {
       };
       configFile = "${wrapper}/config.json";
     in
-      notIsFile configFile;
+    notIsFile configFile;
 
   "config chains" =
     let
@@ -236,7 +236,7 @@ test { wrapper = "oh-my-posh"; } {
         ];
     };
 
-  "explicit extends in settings breaks the config chain" =
+  "explicit `extends` in settings breaks the config chain" =
     let
       wrapper = wm.wrap {
         inherit pkgs;
@@ -252,5 +252,56 @@ test { wrapper = "oh-my-posh"; } {
       (isFile "${configChainDir}/settings.json")
       (notIsFile "${configChainDir}/agnoster.omp.json")
       (notIsFile "${configChainDir}/aliens.omp.json")
+    ];
+
+  "extending segments works as expected" =
+    let
+      wrapper = wm.wrap {
+        inherit pkgs;
+        configFile = writeText "config.yaml" ''
+          blocks:
+            - type: prompt
+              alignment: left
+              segments:
+                - type: text
+                  style: plain
+                  template: "[b1s1]"
+                - type: text
+                  style: plain
+                  template: "[b1s2]"
+            - type: prompt
+              alignment: right
+              segments:
+                - type: text
+                  style: plain
+                  template: "[b2s1]"
+                - type: text
+                  style: plain
+                  template: "[b2s2]"
+                  alias: foo
+        '';
+        settings.blocks = [
+          {
+            type = "prompt";
+            alignment = "right";
+            segments = [
+              {
+                type = "text";
+                style = "plain";
+                alias = "foo";
+                template = "foo";
+              }
+            ];
+          }
+        ];
+      };
+    in
+    # '[b2s2]' should be overridden with 'foo'
+    [
+      "${wrapper}/bin/oh-my-posh print primary | grep -Fq  '[b1s1]'"
+      "${wrapper}/bin/oh-my-posh print primary | grep -Fq  '[b1s2]'"
+      "${wrapper}/bin/oh-my-posh print primary | grep -Fq  '[b2s1]'"
+      "${wrapper}/bin/oh-my-posh print primary | grep -Fqv '[b2s2]'"
+      "${wrapper}/bin/oh-my-posh print primary | grep -Fq  'foo'"
     ];
 }
